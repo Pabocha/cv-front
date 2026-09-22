@@ -62,7 +62,7 @@ export const SECTION_FIELD_CONFIGS = {
       { name: 'position', label: 'Poste', required: true },
       { name: 'company', label: 'Entreprise', required: true },
       { name: 'location', label: 'Localisation' },
-      { name: 'date_range', label: 'Période' },
+      { name: 'date_range', label: 'Période', type: 'period' },
       { name: 'description', label: 'Description', type: 'textarea' },
       { name: 'achievements', label: 'Réalisations', type: 'textarea' },
     ],
@@ -75,7 +75,7 @@ export const SECTION_FIELD_CONFIGS = {
       { name: 'degree', label: 'Diplôme', required: true },
       { name: 'institution', label: 'Établissement', required: true },
       { name: 'field_of_study', label: "Domaine d'étude" },
-      { name: 'date_range', label: 'Période' },
+      { name: 'date_range', label: 'Période', type: 'period', currentLabel: 'En cours' },
     ],
   },
   skills: {
@@ -104,7 +104,7 @@ export const SECTION_FIELD_CONFIGS = {
     fields: [
       { name: 'name', label: 'Certification', required: true },
       { name: 'issuer', label: 'Organisme' },
-      { name: 'date', label: 'Date' },
+      { name: 'date', label: 'Date', type: 'date' },
       { name: 'url', label: 'Lien', type: 'url' },
     ],
   },
@@ -243,4 +243,96 @@ export function defaultStyleFor(slug, partial) {
   }
   if (!partial || typeof partial !== 'object') return base
   return { ...base, ...partial }
+}
+
+export const MONTH_NAMES = {
+  fr: [
+    'Janvier',
+    'Février',
+    'Mars',
+    'Avril',
+    'Mai',
+    'Juin',
+    'Juillet',
+    'Août',
+    'Septembre',
+    'Octobre',
+    'Novembre',
+    'Décembre',
+  ],
+  en: [
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
+  ],
+}
+
+export function yearOptions(from = new Date().getFullYear() - 50, to = new Date().getFullYear() + 1) {
+  const years = []
+  for (let y = to; y >= from; y -= 1) years.push(y)
+  return years
+}
+
+export function composePeriod(value, lang = 'fr') {
+  const v = value || {}
+  const names = MONTH_NAMES[lang] || MONTH_NAMES.fr
+  const start = composePart(v.startMonth, v.startYear, names)
+  if (v.current) {
+    const marker = lang === 'en' ? 'Present' : "Aujourd'hui"
+    return start ? `${start} - ${marker}` : marker
+  }
+  const end = composePart(v.endMonth, v.endYear, names)
+  if (!start && !end) return ''
+  return start && end ? `${start} - ${end}` : start || end
+}
+
+export function composeDate(value, lang = 'fr') {
+  const names = MONTH_NAMES[lang] || MONTH_NAMES.fr
+  return composePart(value?.month, value?.year, names)
+}
+
+export function parsePeriod(value) {
+  const empty = { startMonth: '', startYear: '', endMonth: '', endYear: '', current: false }
+  if (!value || typeof value !== 'string') return empty
+  const parts = value.split(/\s*-\s*/).filter(Boolean)
+  const start = parsePart(parts[0])
+  const current = /aujourd|today|present|actuel/i.test(value)
+  let end = { month: '', year: '' }
+  if (!current && parts.length > 1) end = parsePart(parts[1])
+  return { ...start, ...end, current }
+}
+
+export function parseDate(value) {
+  if (!value || typeof value !== 'string') return { month: '', year: '' }
+  return parsePart(value)
+}
+
+function parsePart(part) {
+  const result = { month: '', year: '' }
+  if (!part) return result
+  const yearMatch = part.match(/\b(19\d{2}|20\d{2})\b/)
+  if (yearMatch) result.year = yearMatch[1]
+  const lower = part.toLowerCase()
+  for (let i = 0; i < 12; i += 1) {
+    if (lower.includes(MONTH_NAMES.fr[i].toLowerCase()) || lower.includes(MONTH_NAMES.en[i].toLowerCase())) {
+      result.month = String(i + 1)
+      break
+    }
+  }
+  return result
+}
+
+function composePart(month, year, names) {
+  const m = month ? names[Number(month) - 1] : ''
+  if (m && year) return `${m} ${year}`
+  return m || year || ''
 }

@@ -1,6 +1,90 @@
 import { useState } from 'react'
 import Button from '../../../components/ui/Button'
-import { SECTION_FIELD_CONFIGS } from './editorConfigs'
+import RichTextarea from './RichTextarea'
+import {
+  MONTH_NAMES,
+  SECTION_FIELD_CONFIGS,
+  composeDate,
+  composePeriod,
+  parseDate,
+  parsePeriod,
+  yearOptions,
+} from './editorConfigs'
+
+const YEARS = yearOptions()
+
+function MonthYear({ value, onChange, language, options }) {
+  return (
+    <span className="flex gap-1">
+      <select
+        value={value.month ?? ''}
+        onChange={(e) => onChange({ ...value, month: e.target.value })}
+        className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+      >
+        <option value="">Mois</option>
+        {(MONTH_NAMES[language] || MONTH_NAMES.fr).map((name, i) => (
+          <option key={name} value={String(i + 1)}>
+            {name}
+          </option>
+        ))}
+      </select>
+      <select
+        value={value.year ?? ''}
+        onChange={(e) => onChange({ ...value, year: e.target.value })}
+        disabled={value.disabled}
+        className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-100 disabled:text-slate-400"
+      >
+        <option value="">Année</option>
+        {options.map((y) => (
+          <option key={y} value={y}>
+            {y}
+          </option>
+        ))}
+      </select>
+    </span>
+  )
+}
+
+function PeriodPicker({ value, onChange, language, currentLabel }) {
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs text-slate-500">Début</span>
+        <MonthYear
+          value={{ month: value.startMonth, year: value.startYear }}
+          onChange={(v) => onChange({ ...value, startMonth: v.month, startYear: v.year })}
+          language={language}
+          options={YEARS}
+        />
+      </div>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs text-slate-500">Fin</span>
+        <MonthYear
+          value={{ month: value.endMonth, year: value.endYear, disabled: value.current }}
+          onChange={(v) => onChange({ ...value, endMonth: v.month, endYear: v.year })}
+          language={language}
+          options={YEARS}
+        />
+        <label className="flex items-center gap-1 whitespace-nowrap text-xs text-slate-600">
+          <input
+            type="checkbox"
+            checked={Boolean(value.current)}
+            onChange={(e) => onChange({ ...value, current: e.target.checked })}
+          />
+          {currentLabel}
+        </label>
+      </div>
+    </div>
+  )
+}
+
+function DatePicker({ value, onChange, language }) {
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <MonthYear value={value} onChange={onChange} language={language} options={YEARS} />
+    </div>
+  )
+}
 
 function DragButtons({ onMove, index, count }) {
   return (
@@ -27,25 +111,35 @@ function DragButtons({ onMove, index, count }) {
   )
 }
 
-function ItemEditor({ config, item, onSave, onCancel }) {
+function defaultValue(f, item) {
+  if (f.type === 'period') return parsePeriod(item?.[f.name])
+  if (f.type === 'date') return parseDate(item?.[f.name])
+  return item?.[f.name] ?? ''
+}
+
+function rawValue(f, value, language) {
+  if (f.type === 'period') return composePeriod(value, language).trim()
+  if (f.type === 'date') return composeDate(value, language).trim()
+  return (value ?? '').trim()
+}
+
+function ItemEditor({ config, item, onSave, onCancel, language }) {
   const [form, setForm] = useState(
-    config.fields.reduce(
-      (acc, f) => ({ ...acc, [f.name]: item?.[f.name] ?? '' }),
-      {},
-    ),
+    config.fields.reduce((acc, f) => ({ ...acc, [f.name]: defaultValue(f, item) }), {}),
   )
   const [error, setError] = useState('')
 
   const submit = (e) => {
     e.preventDefault()
-    const missing = config.fields
-      .filter((f) => f.required && !(form[f.name] ?? '').trim())
+    const missing = config.fields.filter(
+      (f) => f.required && rawValue(f, form[f.name], language) === '',
+    )
     if (missing.length) {
       setError('Veuillez remplir les champs obligatoires.')
       return
     }
     const payload = config.fields.reduce((acc, f) => {
-      const value = (form[f.name] ?? '').trim()
+      const value = rawValue(f, form[f.name], language)
       return { ...acc, [f.name]: value === '' ? null : value }
     }, {})
     onSave(payload)
@@ -60,11 +154,23 @@ function ItemEditor({ config, item, onSave, onCancel }) {
             {f.required && <span className="text-red-500"> *</span>}
           </label>
           {f.type === 'textarea' ? (
-            <textarea
+            <RichTextarea
               value={form[f.name] ?? ''}
-              onChange={(e) => setForm({ ...form, [f.name]: e.target.value })}
+              onChange={(v) => setForm({ ...form, [f.name]: v })}
               rows={2}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          ) : f.type === 'period' ? (
+            <PeriodPicker
+              value={form[f.name]}
+              onChange={(v) => setForm({ ...form, [f.name]: v })}
+              language={language}
+              currentLabel={f.currentLabel || 'En poste'}
+            />
+          ) : f.type === 'date' ? (
+            <DatePicker
+              value={form[f.name]}
+              onChange={(v) => setForm({ ...form, [f.name]: v })}
+              language={language}
             />
           ) : (
             <input
@@ -87,7 +193,7 @@ function ItemEditor({ config, item, onSave, onCancel }) {
   )
 }
 
-function ListSection({ config, items, ops }) {
+function ListSection({ config, items, ops, language }) {
   const [editing, setEditing] = useState(null) // index | 'new' | null
 
   const saveItem = (index, value) => {
@@ -141,6 +247,7 @@ function ListSection({ config, items, ops }) {
               <ItemEditor
                 config={config}
                 item={items[index]}
+                language={language}
                 onSave={(v) => saveItem(index, v)}
                 onCancel={() => setEditing(null)}
               />
@@ -163,6 +270,7 @@ function ListSection({ config, items, ops }) {
           <ItemEditor
             config={config}
             item={null}
+            language={language}
             onSave={(v) => {
               ops.addSectionItem(config.sectionKey, { ...v })
               setEditing(null)
@@ -215,6 +323,7 @@ export default function SectionCard({
   ops,
   sectionIndex,
   sectionCount,
+  language = 'fr',
   pageBreak = false,
   dragHandle = null,
 }) {
@@ -354,12 +463,11 @@ export default function SectionCard({
       {open && (
         <div className="border-t border-slate-100 p-3">
           {section.key === 'summary' ? (
-            <textarea
+            <RichTextarea
               value={content.summary || ''}
-              onChange={(e) => ops.updateSummary(e.target.value)}
+              onChange={(v) => ops.updateSummary(v)}
               rows={4}
               placeholder="Décrivez votre profil en quelques lignes…"
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           ) : section.key === 'interests' ? (
             <InterestsSection
@@ -375,6 +483,7 @@ export default function SectionCard({
               }}
               items={content[section.key] || []}
               ops={ops}
+              language={language}
             />
           )}
         </div>

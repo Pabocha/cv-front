@@ -83,6 +83,7 @@ function SortableSectionCard({
   labels,
   ops,
   pageBreak,
+  language,
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: section.key })
@@ -107,6 +108,7 @@ function SortableSectionCard({
         sectionCount={sectionCount}
         pageBreak={pageBreak}
         dragHandle={{ attributes, listeners }}
+        language={language}
       />
     </div>
   )
@@ -207,7 +209,7 @@ export default function CvEditPage() {
       )}
 
       <div className="flex min-h-0 flex-1 flex-col gap-4 p-4 lg:flex-row">
-        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1 lg:w-1/3 lg:flex-none lg:overflow-y-auto">
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1 lg:w-1/2 lg:flex-none lg:overflow-y-auto">
           <HeaderEditor
             header={draft.content.header || {}}
             labels={labels}
@@ -229,6 +231,7 @@ export default function CvEditPage() {
                   sectionIndex={index}
                   sectionCount={orderedSections.length}
                   pageBreak={draft.layout.page_breaks?.includes(section.key) || false}
+                  language={lang}
                 />
               ))}
             </SortableContext>
@@ -240,7 +243,7 @@ export default function CvEditPage() {
           />
         </div>
 
-        <div className="flex h-[60vh] min-h-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm lg:h-auto lg:w-2/3">
+        <div className="flex h-[60vh] min-h-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm lg:h-auto lg:w-1/2">
           <StyleBar style={draft.style} onChange={editor.updateStyle} />
           <div className="min-h-0 flex-1">
             <LivePreview html={liveHtml} />
