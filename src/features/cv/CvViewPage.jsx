@@ -32,6 +32,15 @@ export default function CvViewPage() {
   }
 
   const handleGenerate = async () => {
+    const hasContent = cv.status !== 'draft'
+    if (
+      hasContent &&
+      !window.confirm(
+        'Générer à nouveau remplacera votre contenu actuel (y compris vos modifications personnalisées) par le contenu issu de votre profil. Continuer ?',
+      )
+    ) {
+      return
+    }
     await generate.mutateAsync(id)
     setPreviewHtml(null)
   }
@@ -82,6 +91,9 @@ export default function CvViewPage() {
       </div>
 
       <div className="flex flex-wrap gap-3">
+        <Link to={`/cv/${id}/edit`}>
+          <Button>Éditer le CV</Button>
+        </Link>
         <Button onClick={handleGenerate} disabled={generate.isPending}>
           {generate.isPending ? 'Génération…' : 'Générer le contenu'}
         </Button>

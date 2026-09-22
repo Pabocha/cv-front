@@ -12,6 +12,7 @@ import ProfilePage from './features/profile/ProfilePage'
 import CvListPage from './features/cv/CvListPage'
 import CvCreatePage from './features/cv/CvCreatePage'
 import CvViewPage from './features/cv/CvViewPage'
+import CvEditPage from './features/cv/CvEditPage'
 import AtsPage from './features/ats/AtsPage'
 import AdaptPage from './features/adapt/AdaptPage'
 import TemplatesPage from './features/templates/TemplatesPage'
@@ -113,6 +114,16 @@ path: 'cvs',
           <ProtectedRoute>
             <DashboardLayout>
               <CvViewPage />
+            </DashboardLayout>
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'cv/:id/edit',
+        element: (
+          <ProtectedRoute>
+            <DashboardLayout>
+              <CvEditPage />
             </DashboardLayout>
           </ProtectedRoute>
         ),
