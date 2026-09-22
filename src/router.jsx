@@ -122,9 +122,7 @@ path: 'cvs',
         path: 'cv/:id/edit',
         element: (
           <ProtectedRoute>
-            <DashboardLayout>
-              <CvEditPage />
-            </DashboardLayout>
+            <CvEditPage />
           </ProtectedRoute>
         ),
       },

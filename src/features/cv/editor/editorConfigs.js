@@ -158,11 +158,18 @@ export const FONT_SIZES = ['8px', '9px', '10px', '11px', '12px', '13px', '14px']
 
 export const LINE_HEIGHTS = ['1.2', '1.3', '1.4', '1.5', '1.6', '1.7', '1.8', '1.9']
 
+export const COLOR_MODES = [
+  { value: 'accents', label: 'Accents seuls' },
+  { value: 'band', label: 'Bandeau' },
+  { value: 'full', label: 'Bandeau + latérale' },
+]
+
 const BASE_STYLE = {
   accent_color: '#4f46e5',
   font: FONT_PRESETS[0].value,
   font_size: '10px',
   line_height: '1.5',
+  color_mode: 'accents',
 }
 
 export const ELEGANT_FONT = FONT_PRESETS[1].value
