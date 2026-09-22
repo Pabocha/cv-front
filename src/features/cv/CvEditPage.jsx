@@ -23,6 +23,7 @@ import useEditor from './editor/useEditor'
 import LivePreview from './editor/LivePreview'
 import SectionCard from './editor/SectionCard'
 import StyleBar from './editor/StyleBar'
+import PhotoField from './editor/PhotoField'
 import CompletenessBar from './editor/CompletenessBar'
 import {
   HEADER_FIELDS,
@@ -49,26 +50,38 @@ function SaveIndicator({ saveState }) {
   return <span className={`text-xs font-medium ${color}`}>{SAVE_LABELS[saveState]}</span>
 }
 
-function HeaderEditor({ header, labels, onChange }) {
+function HeaderEditor({ header, labels, onChange, cvId }) {
   return (
     <details className="group rounded-xl border border-slate-200 bg-white shadow-sm" open>
       <summary className="flex cursor-pointer items-center justify-between px-4 py-3 text-sm font-semibold text-slate-900">
         {labels.contact || 'Contact'}
       </summary>
       <div className="grid gap-3 border-t border-slate-100 p-4 sm:grid-cols-2">
-        {HEADER_FIELDS.map((f) => (
-          <div key={f.name} className={f.name === 'photo' ? 'sm:col-span-2' : ''}>
-            <label className="mb-0.5 block text-xs font-medium text-slate-600">
-              {f.label}
-            </label>
-            <input
-              value={header[f.name] || ''}
-              onChange={(e) => onChange(f.name, e.target.value)}
-              placeholder={f.name === 'photo' ? 'URL de la photo (optionnel)' : ''}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
-        ))}
+        {HEADER_FIELDS.map((f) =>
+          f.name === 'photo' ? (
+            <div key={f.name} className="sm:col-span-2">
+              <label className="mb-0.5 block text-xs font-medium text-slate-600">
+                {f.label}
+              </label>
+              <PhotoField
+                value={header[f.name] || ''}
+                onChange={(v) => onChange(f.name, v)}
+                cvId={cvId}
+              />
+            </div>
+          ) : (
+            <div key={f.name}>
+              <label className="mb-0.5 block text-xs font-medium text-slate-600">
+                {f.label}
+              </label>
+              <input
+                value={header[f.name] || ''}
+                onChange={(e) => onChange(f.name, e.target.value)}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+          ),
+        )}
       </div>
     </details>
   )
@@ -214,6 +227,7 @@ export default function CvEditPage() {
             header={draft.content.header || {}}
             labels={labels}
             onChange={editor.updateHeader}
+            cvId={cv.id}
           />
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
             <SortableContext
@@ -244,7 +258,10 @@ export default function CvEditPage() {
         </div>
 
         <div className="flex h-[60vh] min-h-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm lg:h-auto lg:w-1/2">
-          <StyleBar style={draft.style} onChange={editor.updateStyle} />
+          <StyleBar
+            style={draft.style}
+            onChange={editor.updateStyle}
+          />
           <div className="min-h-0 flex-1">
             <LivePreview html={liveHtml} />
           </div>

@@ -1,5 +1,6 @@
 import {
   ACCENT_PALETTE,
+  BACKGROUNDS,
   COLOR_MODES,
   FONT_PRESETS,
   FONT_SIZES,
@@ -80,6 +81,14 @@ export default function StyleBar({ style, onChange }) {
           </label>
         </div>
       </div>
+
+      <Select
+        label="Arrière-plan"
+        value={style.background || 'none'}
+        onChange={(background) => onChange({ background })}
+        options={BACKGROUNDS}
+        optionLabel={(o) => o.label}
+      />
 
       <Select
         label="Police"

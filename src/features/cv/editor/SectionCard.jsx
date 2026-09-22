@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import Button from '../../../components/ui/Button'
-import RichTextarea from './RichTextarea'
+import RichEditor from './RichEditor'
 import {
   MONTH_NAMES,
   SECTION_FIELD_CONFIGS,
@@ -154,7 +154,7 @@ function ItemEditor({ config, item, onSave, onCancel, language }) {
             {f.required && <span className="text-red-500"> *</span>}
           </label>
           {f.type === 'textarea' ? (
-            <RichTextarea
+            <RichEditor
               value={form[f.name] ?? ''}
               onChange={(v) => setForm({ ...form, [f.name]: v })}
               rows={2}
@@ -463,7 +463,7 @@ export default function SectionCard({
       {open && (
         <div className="border-t border-slate-100 p-3">
           {section.key === 'summary' ? (
-            <RichTextarea
+            <RichEditor
               value={content.summary || ''}
               onChange={(v) => ops.updateSummary(v)}
               rows={4}

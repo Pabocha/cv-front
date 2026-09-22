@@ -20,3 +20,11 @@ export const previewCv = (id) =>
 
 export const pdfCv = (id) =>
   api.get(`/cvs/${id}/pdf/`, { responseType: 'blob' })
+
+export const uploadCvPhoto = (id, file) => {
+  const data = new FormData()
+  data.append('photo', file)
+  return api.post(`/cvs/${id}/upload_photo/`, data, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+}

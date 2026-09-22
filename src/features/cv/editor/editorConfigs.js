@@ -50,7 +50,7 @@ export const HEADER_FIELDS = [
   { name: 'github', label: 'GitHub' },
   { name: 'portfolio', label: 'Portfolio' },
   { name: 'website', label: 'Site web' },
-  { name: 'photo', label: 'Photo (URL)' },
+  { name: 'photo', label: 'Photo' },
 ]
 
 export const SECTION_FIELD_CONFIGS = {
@@ -164,12 +164,22 @@ export const COLOR_MODES = [
   { value: 'full', label: 'Bandeau + latérale' },
 ]
 
+export const BACKGROUNDS = [
+  { value: 'none', label: 'Aucun' },
+  { value: 'dots', label: 'Pointillés' },
+  { value: 'ruled', label: 'Traces' },
+  { value: 'grid', label: 'Quadrillage' },
+  { value: 'stripes', label: 'Rayures' },
+  { value: 'gradient', label: 'Dégradé' },
+]
+
 const BASE_STYLE = {
   accent_color: '#4f46e5',
   font: FONT_PRESETS[0].value,
   font_size: '10px',
   line_height: '1.5',
   color_mode: 'accents',
+  background: 'none',
 }
 
 export const ELEGANT_FONT = FONT_PRESETS[1].value
@@ -232,7 +242,10 @@ export function normalizeEditorLayout(layout, slug) {
     ? layout.page_breaks.filter((k) => SECTION_ORDER.includes(k))
     : []
 
-  return { sections, page_breaks: pageBreaks }
+  return {
+    sections,
+    page_breaks: pageBreaks,
+  }
 }
 
 export function defaultStyleFor(slug, partial) {
