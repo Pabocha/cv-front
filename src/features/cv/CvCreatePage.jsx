@@ -110,12 +110,12 @@ export default function CvCreatePage() {
                       : 'border-slate-200 hover:border-slate-300'
                   } ${tpl.is_premium && !isPremium ? 'opacity-90' : ''}`}
                 >
-                  <span className="pointer-events-none flex h-32 overflow-hidden bg-slate-100">
+                  <span className="pointer-events-none flex h-64 overflow-hidden bg-slate-100">
                     <img
                       src={getTemplateThumbnailUrl(tpl.slug)}
                       alt={`Aperçu ${tpl.name}`}
                       loading="lazy"
-                      className="h-full min-w-full object-cover object-top"
+                      className="mx-auto block h-full max-w-full object-contain"
                     />
                   </span>
                   <span className="flex items-center justify-between gap-2 p-3">
