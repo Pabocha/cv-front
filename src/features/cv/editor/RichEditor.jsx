@@ -27,23 +27,25 @@ export default function RichEditor({ value, onChange, rows = 2, placeholder }) {
     }
   }, [value])
 
-  const exec = (cmd) => {
-    ref.current?.focus()
-    document.execCommand(cmd, false, null)
+  const exec = (cmd, arg = null) => {
+    const el = ref.current
+    if (!el) return
+    el.focus()
+    try {
+      if (document.queryCommandSupported && !document.queryCommandSupported(cmd)) return
+      document.execCommand(cmd, false, arg)
+    } catch {
+      return
+    }
     sync()
   }
 
-  const clearFormat = () => {
-    ref.current?.focus()
-    document.execCommand('removeFormat', false, null)
-    sync()
-  }
+  const clearFormat = () => exec('removeFormat')
 
   const handlePaste = (e) => {
     e.preventDefault()
     const text = e.clipboardData?.getData('text/plain') || ''
-    document.execCommand('insertText', false, text)
-    sync()
+    exec('insertText', text)
   }
 
   return (

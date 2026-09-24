@@ -211,7 +211,11 @@ export default function useEditor(id) {
   })
 
   const updateHeader = useCallback(
-    (field, value) => mutate(false, (d) => (d.content.header[field] = value)),
+    (field, value) =>
+      mutate(false, (d) => {
+        if (value === undefined || value === null) delete d.content.header[field]
+        else d.content.header[field] = value
+      }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   )

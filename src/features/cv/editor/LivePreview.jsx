@@ -23,13 +23,18 @@ export default function LivePreview({ html }) {
 
   const zoomPresets = [50, 75, 100, 125, 150]
 
+  const stepZoom = (delta) => {
+    setFit(false)
+    setManualZoom((z) => Math.max(25, Math.min(250, z + delta)))
+  }
+
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between border-b border-slate-200 px-3 py-2">
         <div className="flex items-center gap-1">
           <button
             type="button"
-            onClick={() => setManualZoom(100)}
+            onClick={() => stepZoom(-10)}
             className="rounded px-2 py-1 text-xs hover:bg-slate-100"
           >
             −
@@ -51,7 +56,7 @@ export default function LivePreview({ html }) {
           ))}
           <button
             type="button"
-            onClick={() => setManualZoom(100)}
+            onClick={() => stepZoom(10)}
             className="rounded px-2 py-1 text-xs hover:bg-slate-100"
           >
             +

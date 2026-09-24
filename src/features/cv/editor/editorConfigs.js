@@ -43,15 +43,36 @@ export const HEADER_FIELDS = [
   { name: 'title', label: 'Intitulé du poste' },
   { name: 'email', label: 'Email' },
   { name: 'phone', label: 'Téléphone' },
-  { name: 'city', label: 'Ville' },
-  { name: 'country', label: 'Pays' },
   { name: 'address', label: 'Adresse' },
+  { name: 'city', label: 'Ville' },
+  { name: 'postal_code', label: 'Code postal' },
+  { name: 'country', label: 'Pays' },
   { name: 'linkedin', label: 'LinkedIn' },
   { name: 'github', label: 'GitHub' },
   { name: 'portfolio', label: 'Portfolio' },
   { name: 'website', label: 'Site web' },
   { name: 'photo', label: 'Photo' },
 ]
+
+export const OPTIONAL_HEADER_FIELDS = [
+  { name: 'birth_date', label: 'Date de naissance', placeholder: 'ex. 12 mars 1992' },
+  { name: 'birth_place', label: 'Lieu de naissance', placeholder: 'ex. Saint-Louis' },
+  { name: 'nationality', label: 'Nationalité', placeholder: 'ex. Sénégalaise' },
+  { name: 'license', label: 'Permis de conduire', placeholder: 'ex. Permis B' },
+  { name: 'marital_status', label: 'Situation matrimoniale', placeholder: 'ex. Célibataire' },
+]
+
+export const LANGUAGE_LEVELS = [
+  'Notions',
+  'Débutant',
+  'Intermédiaire',
+  'Avancé',
+  'Courant',
+  'Bilingue',
+  'Langue maternelle',
+]
+
+export const SKILL_LEVELS = ['Débutant', 'Intermédiaire', 'Avancé', 'Expert']
 
 export const SECTION_FIELD_CONFIGS = {
   experiences: {
@@ -84,7 +105,8 @@ export const SECTION_FIELD_CONFIGS = {
     emptyText: 'Ajoutez vos compétences.',
     fields: [
       { name: 'name', label: 'Compétence', required: true },
-      { name: 'level', label: 'Niveau' },
+      { name: 'level', label: 'Niveau', type: 'select', options: SKILL_LEVELS },
+      { name: 'rating', label: 'Barre de niveau (0-5)', type: 'rating' },
       { name: 'category', label: 'Catégorie' },
     ],
   },
@@ -94,7 +116,8 @@ export const SECTION_FIELD_CONFIGS = {
     emptyText: 'Ajoutez vos langues.',
     fields: [
       { name: 'name', label: 'Langue', required: true },
-      { name: 'level', label: 'Niveau' },
+      { name: 'level', label: 'Niveau', type: 'select', options: LANGUAGE_LEVELS },
+      { name: 'rating', label: 'Barre de niveau (0-5)', type: 'rating' },
     ],
   },
   certifications: {

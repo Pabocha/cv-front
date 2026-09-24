@@ -114,13 +114,48 @@ function DragButtons({ onMove, index, count }) {
 function defaultValue(f, item) {
   if (f.type === 'period') return parsePeriod(item?.[f.name])
   if (f.type === 'date') return parseDate(item?.[f.name])
+  if (f.type === 'rating') return Number(item?.[f.name]) || 0
   return item?.[f.name] ?? ''
 }
 
 function rawValue(f, value, language) {
   if (f.type === 'period') return composePeriod(value, language).trim()
   if (f.type === 'date') return composeDate(value, language).trim()
+  if (f.type === 'rating') {
+    const n = Number(value)
+    return Number.isFinite(n) && n > 0 ? Math.min(5, Math.round(n)) : null
+  }
   return (value ?? '').trim()
+}
+
+function RatingPicker({ value, onChange }) {
+  const current = Number(value) || 0
+  return (
+    <span className="flex items-center gap-1">
+      {[1, 2, 3, 4, 5].map((n) => (
+        <button
+          key={n}
+          type="button"
+          aria-label={`Niveau ${n} sur 5`}
+          onClick={() => onChange(n === current ? 0 : n)}
+          className={`h-6 w-6 rounded border text-xs ${
+            n <= current
+              ? 'border-indigo-600 bg-indigo-600 text-white'
+              : 'border-slate-300 bg-white text-slate-400 hover:border-indigo-400 hover:text-indigo-600'
+          }`}
+        >
+          {n}
+        </button>
+      ))}
+      <button
+        type="button"
+        onClick={() => onChange(0)}
+        className="ml-1 text-xs text-slate-400 hover:text-slate-600"
+      >
+        Effacer
+      </button>
+    </span>
+  )
 }
 
 function ItemEditor({ config, item, onSave, onCancel, language }) {
@@ -171,6 +206,24 @@ function ItemEditor({ config, item, onSave, onCancel, language }) {
               value={form[f.name]}
               onChange={(v) => setForm({ ...form, [f.name]: v })}
               language={language}
+            />
+          ) : f.type === 'select' ? (
+            <select
+              value={form[f.name] ?? ''}
+              onChange={(e) => setForm({ ...form, [f.name]: e.target.value })}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="">Non renseigné</option>
+              {(f.options || []).map((opt) => (
+                <option key={opt} value={opt}>
+                  {opt}
+                </option>
+              ))}
+            </select>
+          ) : f.type === 'rating' ? (
+            <RatingPicker
+              value={form[f.name] ?? 0}
+              onChange={(v) => setForm({ ...form, [f.name]: v })}
             />
           ) : (
             <input
@@ -284,33 +337,61 @@ function ListSection({ config, items, ops, language }) {
 }
 
 function InterestsSection({ items, ops, label }) {
+  const [draft, setDraft] = useState('')
+
+  const add = () => {
+    const value = draft.trim()
+    if (!value) return
+    ops.addSectionItem('interests', { text: value })
+    setDraft('')
+  }
+
   return (
     <div className="space-y-2">
-      {items.map((value, index) => (
-        <div key={index} className="flex items-center gap-2">
-          <DragButtons
-            index={index}
-            count={items.length}
-            onMove={(to) => ops.moveSectionItem('interests', index, to)}
-          />
-          <input
-            value={value ?? ''}
-            onChange={(e) => ops.updateSectionItem('interests', index, { text: e.target.value })}
-            placeholder={label}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-          <Button
-            variant="danger"
-            className="text-xs"
-            onClick={() => ops.removeSectionItem('interests', index)}
-          >
-            Supprimer
-          </Button>
-        </div>
-      ))}
-      <Button variant="secondary" className="text-xs" onClick={() => ops.addSectionItem('interests', { text: '' })}>
-        + Ajouter
-      </Button>
+      <div className="flex flex-col gap-1.5">
+        {items.map((value, index) => (
+          <div key={index} className="flex items-center gap-1.5">
+            <DragButtons
+              index={index}
+              count={items.length}
+              onMove={(to) => ops.moveSectionItem('interests', index, to)}
+            />
+            <span className="inline-flex min-w-0 flex-1 items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 py-1 pl-3 pr-1">
+              <input
+                value={value ?? ''}
+                onChange={(e) => ops.updateSectionItem('interests', index, { text: e.target.value })}
+                aria-label={label}
+                className="min-w-0 flex-1 border-0 bg-transparent px-0 py-0 text-sm text-indigo-800 focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => ops.removeSectionItem('interests', index)}
+                aria-label="Retirer"
+                className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-indigo-400 hover:bg-indigo-100 hover:text-indigo-700"
+              >
+                ×
+              </button>
+            </span>
+          </div>
+        ))}
+      </div>
+      <div className="flex gap-2">
+        <input
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              add()
+            }
+          }}
+          placeholder="Ajouter un centre d'intérêt…"
+          className="min-w-0 flex-1 rounded-full border border-slate-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        />
+        <Button variant="secondary" className="text-xs" onClick={add}>
+          + Ajouter
+        </Button>
+      </div>
     </div>
   )
 }
