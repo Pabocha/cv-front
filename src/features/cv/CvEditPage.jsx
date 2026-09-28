@@ -86,7 +86,11 @@ function HeaderEditor({ header, labels, onChange, cvId }) {
           <div className="flex items-start gap-3">
             <PhotoField
               value={header.photo || ''}
-              onChange={(v) => onChange('photo', v)}
+              photoScale={header.photo_scale || '1'}
+              photoRotation={header.photo_rotation || '0'}
+              photoOffsetX={header.photo_offset_x || '50'}
+              photoOffsetY={header.photo_offset_y || '50'}
+              onChange={onChange}
               cvId={cvId}
             />
             <div className="min-w-0 flex-1">

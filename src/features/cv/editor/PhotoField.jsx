@@ -2,7 +2,15 @@ import { useState } from 'react'
 import { cvPhotoUrl } from '../../../utils/media'
 import PhotoModal from './PhotoModal'
 
-export default function PhotoField({ value, onChange, cvId }) {
+export default function PhotoField({
+  value,
+  photoScale,
+  photoRotation,
+  photoOffsetX,
+  photoOffsetY,
+  onChange,
+  cvId,
+}) {
   const [open, setOpen] = useState(false)
   const src = cvPhotoUrl(value)
 
@@ -41,6 +49,10 @@ export default function PhotoField({ value, onChange, cvId }) {
         open={open}
         src={src}
         cvId={cvId}
+        photoScale={photoScale}
+        photoRotation={photoRotation}
+        photoOffsetX={photoOffsetX}
+        photoOffsetY={photoOffsetY}
         onChange={onChange}
         onClose={() => setOpen(false)}
       />
