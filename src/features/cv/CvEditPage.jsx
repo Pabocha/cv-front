@@ -26,6 +26,7 @@ import SectionCard from './editor/SectionCard'
 import StyleBar from './editor/StyleBar'
 import PhotoField from './editor/PhotoField'
 import CompletenessBar from './editor/CompletenessBar'
+import useImprove from './useImprove'
 
 const ImportModal = lazy(() => import('./editor/ImportModal'))
 import {
@@ -193,6 +194,7 @@ function SortableSectionCard({
   content,
   labels,
   ops,
+  ai,
   pageBreak,
   language,
 }) {
@@ -215,6 +217,7 @@ function SortableSectionCard({
         content={content}
         style={{ labels }}
         ops={ops}
+        ai={ai}
         sectionIndex={sectionIndex}
         sectionCount={sectionCount}
         pageBreak={pageBreak}
@@ -237,6 +240,11 @@ export default function CvEditPage() {
   const [importOpen, setImportOpen] = useState(false)
   const [templatePaywallOpen, setTemplatePaywallOpen] = useState(false)
   const [pdfPaywallOpen, setPdfPaywallOpen] = useState(false)
+  // Un quota unique par CV : le hook est monté une seule fois et partagé par
+  // tous les champs. `flushNow` force l'enregistrement avant l'appel, le serveur
+  // reconstruisant le contexte du CV depuis la base.
+  const improve = useImprove(id)
+  const ai = { ...improve, flushNow: editor.flushNow }
 
   useEffect(() => {
     if (downloadPdf.isError && downloadPdf.error?.response?.status === 402) {
@@ -390,6 +398,7 @@ export default function CvEditPage() {
                   content={draft.content}
                   labels={labels}
                   ops={ops}
+                  ai={ai}
                   sectionIndex={index}
                   sectionCount={orderedSections.length}
                   pageBreak={draft.layout.page_breaks?.includes(section.key) || false}

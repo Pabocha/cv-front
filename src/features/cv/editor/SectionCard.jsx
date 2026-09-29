@@ -1,13 +1,16 @@
 import { useState } from 'react'
 import Button from '../../../components/ui/Button'
+import ImproveField from './ImproveField'
 import RichEditor from './RichEditor'
 import {
+  AI_IMPROVABLE_FIELDS,
   MONTH_NAMES,
   SECTION_FIELD_CONFIGS,
   composeDate,
   composePeriod,
   parseDate,
   parsePeriod,
+  periodParts,
   yearOptions,
 } from './editorConfigs'
 
@@ -158,7 +161,7 @@ function RatingPicker({ value, onChange }) {
   )
 }
 
-function ItemEditor({ config, item, onSave, onCancel, language }) {
+function ItemEditor({ config, item, index, ai, onSave, onCancel, language }) {
   const [form, setForm] = useState(
     config.fields.reduce((acc, f) => ({ ...acc, [f.name]: defaultValue(f, item) }), {}),
   )
@@ -177,6 +180,10 @@ function ItemEditor({ config, item, onSave, onCancel, language }) {
       const value = rawValue(f, form[f.name], language)
       return { ...acc, [f.name]: value === '' ? null : value }
     }, {})
+    // Période choisie -> années structurées (calculées côté serveur).
+    if (config.periodFields) {
+      Object.assign(payload, periodParts(form.date_range))
+    }
     onSave(payload)
   }
 
@@ -189,11 +196,23 @@ function ItemEditor({ config, item, onSave, onCancel, language }) {
             {f.required && <span className="text-red-500"> *</span>}
           </label>
           {f.type === 'textarea' ? (
-            <RichEditor
-              value={form[f.name] ?? ''}
-              onChange={(v) => setForm({ ...form, [f.name]: v })}
-              rows={2}
-            />
+            <>
+              <RichEditor
+                value={form[f.name] ?? ''}
+                onChange={(v) => setForm({ ...form, [f.name]: v })}
+                rows={2}
+              />
+              {AI_IMPROVABLE_FIELDS.has(f.name) && (
+                <ImproveField
+                  field={f.name}
+                  section={config.sectionKey}
+                  index={index}
+                  value={form[f.name] ?? ''}
+                  onApply={(v) => setForm({ ...form, [f.name]: v })}
+                  ai={ai}
+                />
+              )}
+            </>
           ) : f.type === 'period' ? (
             <PeriodPicker
               value={form[f.name]}
@@ -246,7 +265,7 @@ function ItemEditor({ config, item, onSave, onCancel, language }) {
   )
 }
 
-function ListSection({ config, items, ops, language }) {
+function ListSection({ config, items, ops, ai, language }) {
   const [editing, setEditing] = useState(null) // index | 'new' | null
 
   const saveItem = (index, value) => {
@@ -300,6 +319,8 @@ function ListSection({ config, items, ops, language }) {
               <ItemEditor
                 config={config}
                 item={items[index]}
+                index={index}
+                ai={ai}
                 language={language}
                 onSave={(v) => saveItem(index, v)}
                 onCancel={() => setEditing(null)}
@@ -402,6 +423,7 @@ export default function SectionCard({
   content,
   style,
   ops,
+  ai,
   sectionIndex,
   sectionCount,
   language = 'fr',
@@ -544,12 +566,20 @@ export default function SectionCard({
       {open && (
         <div className="border-t border-slate-100 p-3">
           {section.key === 'summary' ? (
-            <RichEditor
-              value={content.summary || ''}
-              onChange={(v) => ops.updateSummary(v)}
-              rows={4}
-              placeholder="Décrivez votre profil en quelques lignes…"
-            />
+            <>
+              <RichEditor
+                value={content.summary || ''}
+                onChange={(v) => ops.updateSummary(v)}
+                rows={4}
+                placeholder="Décrivez votre profil en quelques lignes…"
+              />
+              <ImproveField
+                field="summary"
+                value={content.summary || ''}
+                onApply={ops.updateSummary}
+                ai={ai}
+              />
+            </>
           ) : section.key === 'interests' ? (
             <InterestsSection
               items={content.interests || []}
@@ -564,6 +594,7 @@ export default function SectionCard({
               }}
               items={content[section.key] || []}
               ops={ops}
+              ai={ai}
               language={language}
             />
           )}

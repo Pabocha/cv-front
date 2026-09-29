@@ -74,11 +74,22 @@ export const LANGUAGE_LEVELS = [
 
 export const SKILL_LEVELS = ['Débutant', 'Intermédiaire', 'Avancé', 'Expert']
 
+/**
+ * Champs que l'IA peut reformuler. Miroir de `ai.services.IMPROVABLE_FIELDS` :
+ * un champ absent d'ici est refusé par le serveur (400), on ne propose donc pas
+ * le bouton « Améliorer » sur un champ qu'il refuserait.
+ */
+export const AI_IMPROVABLE_FIELDS = new Set(['summary', 'description', 'achievements'])
+
 export const SECTION_FIELD_CONFIGS = {
   experiences: {
     titleField: 'position',
     subtitleField: 'company',
     emptyText: 'Ajoutez vos expériences professionnelles.',
+    // Champs dérivés de `date_range`, jamais affichés. Ils portent les années
+    // utilisées pour calculer l'ancienneté (score ATS, adaptation à une offre) :
+    // sans eux, toute expérience est comptée 0 an après une sauvegarde.
+    periodFields: ['date_start', 'date_end', 'is_current'],
     fields: [
       { name: 'position', label: 'Poste', required: true },
       { name: 'company', label: 'Entreprise', required: true },
@@ -331,6 +342,23 @@ export function composePeriod(value, lang = 'fr') {
   return start && end ? `${start} - ${end}` : start || end
 }
 
+/**
+ * Années structurées dérivées de la période choisie par l'utilisateur.
+ *
+ * Seule l'année est remontée : c'est tout ce dont le backend a besoin pour
+ * l'ancienneté, et cela reste indépendant de la langue d'affichage.
+ * Quand le poste est en cours, `date_end` est vidé et `is_current` passe à vrai
+ * pour éviter de compter une période déjà terminée.
+ */
+export function periodParts(period) {
+  const current = Boolean(period?.current)
+  return {
+    date_start: period?.startYear ? String(period.startYear) : '',
+    date_end: current || !period?.endYear ? '' : String(period.endYear),
+    is_current: current,
+  }
+}
+
 export function composeDate(value, lang = 'fr') {
   const names = MONTH_NAMES[lang] || MONTH_NAMES.fr
   return composePart(value?.month, value?.year, names)
@@ -339,12 +367,23 @@ export function composeDate(value, lang = 'fr') {
 export function parsePeriod(value) {
   const empty = { startMonth: '', startYear: '', endMonth: '', endYear: '', current: false }
   if (!value || typeof value !== 'string') return empty
-  const parts = value.split(/\s*-\s*/).filter(Boolean)
+  // Le backend sépare les bornes par un tiret demi-cadratin (–) et abrege les
+  // mois (« janv. 2021 – mars 2023 ») : on accepte les trois tirets et les
+  // abréviations, sinon éditer une période générée perdrait la date de fin.
+  const parts = value.split(/[\s]*[-–—]+[\s]*/).filter(Boolean)
   const start = parsePart(parts[0])
-  const current = /aujourd|today|present|actuel/i.test(value)
-  let end = { month: '', year: '' }
-  if (!current && parts.length > 1) end = parsePart(parts[1])
-  return { ...start, ...end, current }
+  const current = CURRENT_RE.test(foldText(value))
+  const end = !current && parts.length > 1 ? parsePart(parts[1]) : { month: '', year: '' }
+  // parsePart rend { month, year } (forme attendue par composeDate) ; ici il faut
+  // les préfixer, sinon le sélecteur de période s'affiche vide et la sauvegarde
+  // réécrit des dates vides.
+  return {
+    startMonth: start.month,
+    startYear: start.year,
+    endMonth: end.month,
+    endYear: end.year,
+    current,
+  }
 }
 
 export function parseDate(value) {
@@ -352,19 +391,53 @@ export function parseDate(value) {
   return parsePart(value)
 }
 
+/** Minuscules, sans accents ni ponctuation : pour comparer des libellés. */
+function foldText(value) {
+  return String(value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 function parsePart(part) {
   const result = { month: '', year: '' }
   if (!part) return result
   const yearMatch = part.match(/\b(19\d{2}|20\d{2})\b/)
   if (yearMatch) result.year = yearMatch[1]
-  const lower = part.toLowerCase()
-  for (let i = 0; i < 12; i += 1) {
-    if (lower.includes(MONTH_NAMES.fr[i].toLowerCase()) || lower.includes(MONTH_NAMES.en[i].toLowerCase())) {
-      result.month = String(i + 1)
-      break
-    }
-  }
+  result.month = findMonth(foldText(part))
   return result
+}
+
+// Mois du backend (cvs.services.MONTHS_FR) en plus des libellés complets.
+const MONTH_ABBREVIATIONS = [
+  'janv', 'fevr', 'mars', 'avr', 'mai', 'juin',
+  'juil', 'aout', 'sept', 'oct', 'nov', 'dec',
+]
+
+const CURRENT_RE = /aujourd|present|today|actuel|en poste/
+
+// Les libellés les plus longs d'abord, sinon « juil » matcherait « juil. »
+// avant « juillet » et le mois lu serait faux.
+const MONTH_MATCHERS = (() => {
+  const tokens = new Map()
+  const add = (label, index) => {
+    const folded = foldText(label).replace(/\s/g, '')
+    if (folded) tokens.set(folded, index + 1)
+  }
+  MONTH_NAMES.fr.forEach(add)
+  MONTH_NAMES.en.forEach(add)
+  MONTH_ABBREVIATIONS.forEach(add)
+  return [...tokens.entries()].sort((a, b) => b[0].length - a[0].length)
+})()
+
+function findMonth(folded) {
+  for (const [token, index] of MONTH_MATCHERS) {
+    if (new RegExp(`\\b${token}\\b`).test(folded)) return String(index)
+  }
+  return ''
 }
 
 function composePart(month, year, names) {
