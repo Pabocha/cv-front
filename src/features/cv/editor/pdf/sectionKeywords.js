@@ -135,18 +135,29 @@ export function detectHeading(line, lang = 'fr') {
   const n = cleanHeading(line)
   if (!n || n.length > HEADING_MAX_LEN || n.split(/\s+/).length > 5) return null
   for (const key of SECTION_KEYS) {
-    const words = SORTED_KEYWORDS[lang]?.[key] || SORTED_KEYWORDS.fr[key] || []
-    for (const word of words) {
-      if (!startsWithWord(n, word)) continue
-      const rest = n.slice(word.length).trim()
-      if (
-        rest.split(/\s+/).length <= HEADING_MAX_REST_WORDS &&
-        rest.length <= HEADING_MAX_REST_LEN &&
-        !REST_SENTENCE_RE.test(rest)
-      ) {
-        return key
+    // La langue du CV n'est pas toujours connue ni correcte : un titled
+    // « EXPERIENCE » se rencontre dans un CV français. On essaie donc la langue
+    // demandée, puis les autres — sans cela, la moitié des rubriques disparaît.
+    for (const candidate of langFallbacks(lang)) {
+      const words = SORTED_KEYWORDS[candidate]?.[key] || []
+      for (const word of words) {
+        if (!startsWithWord(n, word)) continue
+        const rest = n.slice(word.length).trim()
+        if (
+          rest.split(/\s+/).length <= HEADING_MAX_REST_WORDS &&
+          rest.length <= HEADING_MAX_REST_LEN &&
+          !REST_SENTENCE_RE.test(rest)
+        ) {
+          return key
+        }
       }
     }
   }
   return null
+}
+
+/** Langue demandée d'abord, puis toutes les autres. */
+function langFallbacks(lang) {
+  const others = Object.keys(SORTED_KEYWORDS).filter((key) => key !== lang)
+  return [lang, ...others].filter((key) => SORTED_KEYWORDS[key])
 }

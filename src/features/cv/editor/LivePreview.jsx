@@ -30,12 +30,12 @@ export default function LivePreview({ html }) {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between border-b border-slate-200 px-3 py-2">
+      <div className="flex items-center justify-between border-b border-slate-200/80 bg-[#fbfaf7] px-4 py-2.5">
         <div className="flex items-center gap-1">
           <button
             type="button"
             onClick={() => stepZoom(-10)}
-            className="rounded px-2 py-1 text-xs hover:bg-slate-100"
+            className="rounded-md px-2 py-1 text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-900"
           >
             −
           </button>
@@ -48,7 +48,7 @@ export default function LivePreview({ html }) {
                 setManualZoom(z)
               }}
               className={`rounded px-2 py-1 text-xs ${
-                !fit && manualZoom === z ? 'bg-indigo-100 text-indigo-700' : 'text-slate-500 hover:bg-slate-100'
+                !fit && manualZoom === z ? 'bg-indigo-100 font-semibold text-indigo-700' : 'text-slate-500 hover:bg-slate-100'
               }`}
             >
               {z}%
@@ -57,7 +57,7 @@ export default function LivePreview({ html }) {
           <button
             type="button"
             onClick={() => stepZoom(10)}
-            className="rounded px-2 py-1 text-xs hover:bg-slate-100"
+            className="rounded-md px-2 py-1 text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-900"
           >
             +
           </button>
@@ -76,7 +76,7 @@ export default function LivePreview({ html }) {
 
       <div
         ref={containerRef}
-        className="flex-1 overflow-auto bg-slate-200 p-4"
+        className="flex-1 overflow-auto bg-[#e8e6df] p-5"
       >
         <div
           className="mx-auto"
@@ -85,7 +85,7 @@ export default function LivePreview({ html }) {
           <iframe
             srcDoc={html || undefined}
             title="Aperçu en direct"
-            className="border-0 bg-white shadow-md"
+            className="border-0 bg-white shadow-[0_12px_30px_rgba(51,48,43,0.18)]"
             style={{
               width: PAGE_WIDTH,
               height: PAGE_HEIGHT,

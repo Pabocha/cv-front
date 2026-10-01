@@ -78,8 +78,9 @@ function HeaderEditor({ header, labels, onChange, cvId }) {
           >
             <path d="m9 6 6 6-6 6" />
           </svg>
-          {labels.contact || 'Contact'}
+          {labels.contact || 'Contact & Informations personnelles'}
         </span>
+        <span className="text-xs text-slate-400 group-open:hidden">Afficher</span>
       </summary>
       <div className="grid gap-3 border-t border-slate-100 p-4 sm:grid-cols-2">
         <div className="sm:col-span-2">
@@ -100,7 +101,7 @@ function HeaderEditor({ header, labels, onChange, cvId }) {
               <input
                 value={header.full_name || ''}
                 onChange={(e) => onChange('full_name', e.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full rounded-md bg-gray-100 border border-slate-200 px-3 py-3 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
           </div>
@@ -113,7 +114,7 @@ function HeaderEditor({ header, labels, onChange, cvId }) {
             <input
               value={header[f.name] || ''}
               onChange={(e) => onChange(f.name, e.target.value)}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full rounded-md bg-gray-100 border border-slate-200 px-3 py-2.5 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
         ))}
@@ -128,13 +129,13 @@ function HeaderEditor({ header, labels, onChange, cvId }) {
                 value={header[f.name] || ''}
                 onChange={(e) => onChange(f.name, e.target.value)}
                 placeholder={f.placeholder || ''}
-                className="w-full rounded-lg border border-slate-300 py-2 pl-3 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full rounded-md bg-gray-100 border border-slate-200 py-2.5 pl-3 pr-8 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
               <button
                 type="button"
                 onClick={() => onChange(f.name, null)}
                 title={`Retirer ${f.label.toLowerCase()}`}
-                className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700"
               >
                 <svg
                   viewBox="0 0 24 24"
@@ -153,7 +154,7 @@ function HeaderEditor({ header, labels, onChange, cvId }) {
         ))}
 
         {available.length > 0 && (
-          <div className="relative sm:col-span-2">
+          <div className="relative sm:col-span-2 pt-2">
             <button
               type="button"
               onClick={() => setAddOpen((v) => !v)}
@@ -283,9 +284,6 @@ export default function CvEditPage() {
   }
 
   const handleApplyImport = async (parsed) => {
-    // L'import ne modifie JAMAIS le CV courant : il crée un nouveau CV qui
-    // reprend son design (template, layout, style, langue). Le CV affiché reste
-    // donc inchangé jusqu'à la redirection.
     const content = {
       header: parsed.header || {},
       summary: parsed.summary || '',
@@ -298,15 +296,11 @@ export default function CvEditPage() {
       interests: [],
     }
     Object.entries(parsed.sections || {}).forEach(([key, items]) => {
-      // `summary` est une chaîne, pas une section : l'appliquer ici planterait.
       if (key === 'summary' || !Array.isArray(items)) return
       content[key] = items
     })
     try {
       const { data } = await importCv.mutateAsync({ id: cv.id, content })
-      // `CvEditRoute` monte l'éditeur avec `key={id}` : changer d'id démonte donc
-      // l'instance et annule son autosave, sans risque d'écrire le contenu
-      // importé sur le CV d'origine.
       navigate(`/cv/${data.cv.id}/edit`)
     } catch (err) {
       setImportError(err?.response?.data?.detail || "L'import a échoué.")
@@ -314,27 +308,26 @@ export default function CvEditPage() {
   }
 
   return (
-    <div className="flex h-screen flex-col bg-slate-50">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-slate-200 bg-white px-4 py-3">
-        <Link to="/dashboard" className="text-sm font-medium text-slate-500 hover:text-slate-700">
-          ← Tableau de bord
+    <div className="flex h-screen flex-col bg-[#f3f2ee] text-slate-900">
+      {/* Barre supérieure de navigation et actions */}
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-3 border-b border-slate-200/80 bg-[#fbfaf7] px-5 py-3 shadow-sm">
+        <Link to="/dashboard" className="flex items-center gap-2 text-sm font-medium text-slate-500 transition hover:text-slate-900">
+          <span aria-hidden>←</span>
+          <span className="hidden sm:inline">Tableau de bord</span>
         </Link>
-        <h1 className="text-base font-bold text-slate-900">{cv.title}</h1>
+        <div className="hidden h-6 w-px bg-slate-200 sm:block" />
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-indigo-600">Édition du CV</p>
+          <h1 className="text-base font-bold tracking-tight text-slate-950">{cv.title}</h1>
+        </div>
         <div className="ml-auto flex items-center gap-3">
           <button
             type="button"
             onClick={() => setTemplateModalOpen(true)}
-            className="flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 focus:outline-none"
+            className="flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 focus:outline-none"
             title="Choisir un modèle"
           >
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              className="h-4 w-4"
-              aria-hidden
-            >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4" aria-hidden>
               <rect x="3" y="3" width="18" height="21" rx="2" />
               <path d="M9 8h6M9 12h6M9 16h4" />
             </svg>
@@ -343,35 +336,23 @@ export default function CvEditPage() {
           <select
             value={draft.language}
             onChange={(e) => editor.updateLanguage(e.target.value)}
-            className="rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs focus:outline-none"
+            className="rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-xs shadow-sm focus:outline-none"
             title="Langue du CV"
           >
             <option value="fr">Français</option>
             <option value="en">English</option>
           </select>
-          <Button
-            variant="secondary"
-            className="text-xs"
-            onClick={() => {
-              setImportError('')
-              setImportOpen(true)
-            }}
-          >
+          <Button variant="secondary" className="text-xs" onClick={() => { setImportError(''); setImportOpen(true); }}>
             Importer
           </Button>
-          <Button
-            variant="secondary"
-            className="text-xs"
-            onClick={handlePdfDownload}
-            disabled={downloadPdf.isPending}
-          >
+          <Button variant="secondary" className="text-xs" onClick={handlePdfDownload} disabled={downloadPdf.isPending}>
             {downloadPdf.isPending ? 'PDF…' : 'Télécharger PDF'}
           </Button>
           <Button variant="secondary" className="text-xs" onClick={undo} disabled={!canUndo} title="Annuler">
-            ↩ Annuler
+            ↩
           </Button>
           <Button variant="secondary" className="text-xs" onClick={redo} disabled={!canRedo} title="Rétablir">
-            ↪ Rétablir
+            ↪
           </Button>
           <SaveIndicator saveState={saveState} />
         </div>
@@ -381,8 +362,11 @@ export default function CvEditPage() {
         <p className="bg-red-50 px-4 py-2 text-xs text-red-600">{saveError}</p>
       )}
 
-      <div className="flex min-h-0 flex-1 flex-col gap-4 p-4 lg:flex-row">
-        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1 lg:w-1/2 lg:flex-none lg:overflow-y-auto">
+      {/* Contenu principal : 2 colonnes parfaitement réparties (Édition à gauche, Prévisualisation à droite) */}
+      <div className="flex min-h-0 flex-1 flex-col gap-5 p-4 sm:p-5 lg:flex-row lg:gap-6">
+        
+        {/* Colonne de gauche : Éditeur avec sections rétractables et fonds de champs gris */}
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1 lg:w-1/2 lg:flex-none">
           <HeaderEditor
             header={draft.content.header || {}}
             labels={labels}
@@ -417,16 +401,18 @@ export default function CvEditPage() {
           />
         </div>
 
-        <div className="flex h-[60vh] min-h-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm lg:h-auto lg:w-1/2">
+        {/* Colonne de droite : Prévisualisation en direct avec style bar */}
+        <div className="flex h-[60vh] min-h-0 flex-col overflow-hidden rounded-2xl border border-slate-300/80 bg-white shadow-[0_16px_40px_rgba(51,48,43,0.08)] lg:sticky lg:top-5 lg:h-[calc(100vh-6rem)] lg:w-1/2">
           <StyleBar
             style={draft.style}
             onChange={editor.updateStyle}
             onOpenTemplates={() => setTemplateModalOpen(true)}
           />
-          <div className="min-h-0 flex-1">
+          <div className="min-h-0 flex-1 bg-slate-100 overflow-y-auto p-4">
             <LivePreview html={liveHtml} />
           </div>
         </div>
+
       </div>
 
       {templateModalOpen && (

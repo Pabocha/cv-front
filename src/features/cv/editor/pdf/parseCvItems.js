@@ -52,7 +52,11 @@ function routeUrl(url) {
  */
 export function extractProfileHeader(lines) {
   const items = lines.slice(0, HEADER_MAX_LINES).flatMap((line) => line)
-  const [fullName] = getTextWithHighestFeatureScore(items, NAME_FEATURE_SETS)
+  // Une rubrique de mise en page (« CONTACT », « SUMMARY ») est la candidate la
+  // plus tentante pour un nom : elle est en capitales, en gras et seule en haut.
+  // On l'écarte avant de lancer la compétition.
+  const candidates = items.filter((item) => !isCvLabel(item.text))
+  const [fullName] = getTextWithHighestFeatureScore(candidates, NAME_FEATURE_SETS)
   const [email] = getTextWithHighestFeatureScore(items, EMAIL_FEATURE_SETS)
   const [phone] = getTextWithHighestFeatureScore(items, PHONE_FEATURE_SETS)
   const [city] = getTextWithHighestFeatureScore(items, LOCATION_FEATURE_SETS)
@@ -148,25 +152,75 @@ function subsectionLines(subsection) {
   return subsection.map(lineText).map(stripBullet).filter(Boolean)
 }
 
-function buildExperiences(subsection) {
-  const lines = subsectionLines(subsection)
-  if (!lines.length) return null
-  const [dateText] = getTextWithHighestFeatureScore(
-    subsection.flat(),
-    DATE_FEATURE_SETS,
-  )
-  const head = lines[0]
-  // La période a pu être recollée sur l'intitulé : inutile, et nuisible, de la
-  // recopier une seconde fois.
-  const alreadyCarried = !!dateText && lines.some((line) => line.includes(dateText))
+function buildExperiences(subsection, lang = 'fr') {
+  if (!subsection.length) return null
+  const lines = subsection.map((line) => line.map((item) => item.text).join('').trim())
+
+  // La période peut être une ligne à part : on la recherche sur tout le bloc.
+  const [dateText] = getTextWithHighestFeatureScore(subsection.flat(), DATE_FEATURE_SETS)
+
+  let head = lines[0].replace(BULLET_RE, '').trim()
+  const achievements = []
+  const descLines = []
+
+  for (let i = 1; i < lines.length; i += 1) {
+    const text = lines[i]
+    if (!text) continue
+
+    if (BULLET_RE.test(text)) {
+      // Le backend ne reconnaît que le marqueur « - » : on normalise la puce pour
+      // qu'elle devienne réellement une liste, sans quoi elle s'affiche telle quelle.
+      achievements.push(`- ${text.replace(BULLET_RE, '').trim()}`)
+      continue
+    }
+
+    // Un sous-titre de projet est mis en valeur (gras ou italique) et tient sur un
+    // seul item : ce n'est ni une réalisation ni la suite de la puce précédente.
+    // « Plateforme SaaS de gestion scolaire » s'ouvre sur ses propres puces, il
+    // décrit ce qui suit et doit rester lisible.
+    const first = subsection[i][0]
+    const isSubtitle =
+      subsection[i].length === 1 &&
+      (first?.isBold || first?.isItalic) &&
+      !/[.!?]$/.test(text) &&
+      // Une phrase longue est un paragraphe en italique, pas un intitulé court.
+      text.length <= 120
+
+    if (isSubtitle) {
+      descLines.push(text)
+      continue
+    }
+
+    // Une ligne qui suit une puce et n'en porte pas une est la suite de cette
+    // puce : le PDF coupe les réalisations longues sur plusieurs baselines.
+    if (achievements.length) {
+      achievements[achievements.length - 1] += ` ${text}`
+      continue
+    }
+
+    // Avant la première puce, une ligne non titrée est la suite de l'intitulé —
+    // sauf si elle se termine comme une phrase : c'est alors le descriptif, et
+    // l'absorber ferait de la phrase un bout de nom d'entreprise.
+    const endsSentence = /[.!?…:]$/.test(text)
+    if (descLines.length === 0 && !dateText?.includes(text) && !endsSentence) {
+      head = `${head} ${text}`
+      continue
+    }
+
+    descLines.push(text)
+  }
+
+  const alreadyCarried = !!dateText && head.includes(dateText)
   const withDate = dateText && !alreadyCarried ? `${head} ${dateText}` : head
-  const parsed = entryParts(withDate, lines.slice(1))
+  const parsed = entryParts(withDate, [], lang)
+
   return {
     position: parsed.position,
     company: parsed.company,
     location: parsed.location,
     date_range: parsed.date_range,
-    description: parsed.description,
+    description: descLines.join('\n').trim(),
+    achievements: achievements.join('\n'),
   }
 }
 
@@ -280,7 +334,7 @@ const SUPPORTED_SECTIONS = new Set([
   'interests',
 ])
 
-function buildSectionLines(sectionKey, lines) {
+function buildSectionLines(sectionKey, lines, lang = 'fr') {
   if (sectionKey === 'skills') return buildSkills(lines)
   if (sectionKey === 'languages') return buildLanguages(lines)
   if (sectionKey === 'interests') {
@@ -288,6 +342,11 @@ function buildSectionLines(sectionKey, lines) {
       .map((line) => stripBullet(lineText(line)))
       .flatMap((line) => line.split(/\s*[;·|]\s*|\s{2,}/))
       .map((value) => value.trim())
+      .filter(Boolean)
+  }
+  if (sectionKey === 'experiences') {
+    return divideSectionIntoSubsections(lines)
+      .map((subsection) => buildExperiences(subsection, lang))
       .filter(Boolean)
   }
   const build = ENTRY_BUILDERS[sectionKey]
@@ -311,7 +370,7 @@ export function parseCvItems(items, lang = 'fr') {
 
   const header = extractProfileHeader(profileLines)
   if (!header.title) {
-    const title = extractJobTitle(profileLines, header.full_name)
+    const title = extractJobTitle(profileLines, header.full_name, lang)
     if (title) header.title = title
   }
 
@@ -322,7 +381,7 @@ export function parseCvItems(items, lang = 'fr') {
     // Une rubrique reconnue mais absente de l'éditeur (`RÉFÉRENCE`) doit tout
     // de même clore la section précédente, sans rien produire.
     if (!SUPPORTED_SECTIONS.has(group.section)) continue
-    sections[group.section] = buildSectionLines(group.section, group.lines)
+    sections[group.section] = buildSectionLines(group.section, group.lines, lang)
   }
 
   return {

@@ -57,8 +57,16 @@ function mergeLoneDateLines(lines) {
  * dans un CV ne vaut pas 11 pt dans un autre.
  */
 
+/**
+ * La baseline de référence d'une ligne est celle de son dernier item.
+ *
+ * `mergeLoneDateLines` colle une période isolée à la ligne d'intitulé qui la
+ * précède : la ligne résultante contient deux baselines. Prendre la première
+ * ferait appear un saut vertical supplémentaire et couperait l'entrée juste
+ * après son propre titre.
+ */
 function baselineOf(line) {
-  return line[0]?.y
+  return line[line.length - 1]?.y
 }
 
 /** Interlignage le plus fréquent dans la section. */

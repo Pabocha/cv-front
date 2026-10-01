@@ -6,6 +6,10 @@ const BROKEN_DASH_RE = /-\u00AD\u2010/g
 
 const isBoldFont = (fontName) => /bold|black|heavy|semibold|demi/i.test(fontName)
 
+// L'italique porte souvent la même information que le gras : les sous-titres de
+// projet sont en italique sur un grand nombre de modèles.
+const isItalicFont = (fontName) => /italic|oblique/i.test(fontName)
+
 // Résout le nom de police réel (« Arial-BoldMT ») derrière le nom interne que
 // pdf.js invente pour les polices embarquées (« g_d8_f1 »). Sans cette résolution,
 // la détection du gras — et donc celle des titres de section — est inopérante.
@@ -31,6 +35,7 @@ function toItem(raw, page, commonObjs) {
     height: raw.height || 0,
     fontName,
     isBold: isBoldFont(fontName),
+    isItalic: isItalicFont(fontName),
     hasEOL: !!raw.hasEOL,
     page,
   }

@@ -20,20 +20,43 @@ const hasOnlyLettersAndSpaces = (text) => /^[A-Za-z\sÀ-ÿ'&-]+$/.test(text)
  * capitales ne font qu'autoriser un titre plus long — sans cette réserve, une
  * légende en capitales deviendrait une section ; sans ce crédit, un titre en
  * gras mais pas en capitales serait ignoré.
+ *
+ * Les générateurs scindent parfois un titre en pleine justified : « EXPÉRIENCES »
+ * devient deux items, `EXPE` puis `RIENCES`. On recolle donc les items d'une
+ * ligne courte avant de conclure, sans quoi la ligne n'est jamais « seule ».
  */
 export function isSectionTitle(line, lang = 'fr') {
-  if (!isStandaloneLine(line)) return null
   const item = line[0]
-  const text = item.text.trim()
+  const standalone = isStandaloneLine(line)
+  // Recollage des items d'un titre fractionné : uniquement si la ligne est
+  // entièrement occupée par des fragments typographiques courts.
+  const joined = line.length > 1 && line.length <= 4 ? line.map((i) => i.text).join('') : item?.text
+  const text = (joined || '').trim()
   if (!text) return null
 
-  const emphasised = item.isBold && isAllUpperCase(text)
+  const emphasised =
+    line.every((i) => i.isBold === item?.isBold) && (item?.isBold || item?.isItalic) && isAllUpperCase(text)
   const words = cleanHeading(text).split(/\s+/).filter(Boolean)
-  if (words.length > (emphasised ? 4 : 2)) return null
+  // Un titre fractionné garde le compte de mots de sa version reassemblée.
+  const maxWords = emphasised ? 4 : 2
+  if (words.length > maxWords) return null
   if (!hasOnlyLettersAndSpaces(text)) return null
   if (!hasLetter(text) || !/[A-ZÀ-Þ]/.test(text.slice(0, 1))) return null
 
-  return detectHeading(text, lang)
+  // Une ligne partagée avec du contenu n'est un titre que si tout est typographié
+  // de la même façon : sinon « EXPÉRIENCES perturbations clients » passe aussi.
+  if (!standalone && line.some((i) => i.isBold !== item?.isBold || i.isItalic !== item?.isItalic)) {
+    return null
+  }
+
+  const key = detectHeading(text, lang)
+  if (key) return key
+
+  // Un titre justifié est réécrit avec un faux blanc : « EXPÉRIENCES » arrive en
+  // `EXPE` + `RIENCES`, que la fusion sépare par une espace. On retente sans
+  // les blancs, le contrôle de longueur et de casse encadrant déjà le résultat.
+  if (/ /.test(text)) return detectHeading(text.replace(/ /g, ''), lang)
+  return null
 }
 
 /**

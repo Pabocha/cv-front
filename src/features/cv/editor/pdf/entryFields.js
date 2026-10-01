@@ -6,7 +6,10 @@ export const YEAR_RE = /\b(19\d{2}|20\d{2})\b/gi
 // tirets collés sont intacts : « Université Paris-Saclay » n'est pas une plage.
 export const YEAR_RANGE_RE = /\b\d{4}\s*[–—-]\s*\d{4}\b/g
 export const LOOSE_DASH_RE = /\s+[–—-]\s+/g
-const TITLE_SEP_RE = /\s*[|•]\s*|\s+[–—]\s+/
+// Un tiret encadré d'espaces sépare : « Master Informatique - Université
+// Paris-Saclay ». Sans espaces, « Paris-Saclay » et « multi-tenant » restent
+// d'un seul tenant.
+const TITLE_SEP_RE = /\s*[|•]\s*|\s+[–—-]\s+/
 
 const KNOWN_SKILL_LEVELS = new Set(SKILL_LEVELS.map((level) => normalize(level)))
 const KNOWN_LANGUAGE_LEVELS = new Set(LANGUAGE_LEVELS.map((level) => normalize(level)))
@@ -25,7 +28,7 @@ const MONTH_TOKEN_RE = new RegExp(
   'gi',
 )
 
-export function entryParts(titleLine, restLines = []) {
+export function entryParts(titleLine, restLines = [], lang = 'fr') {
   // « 2024 – Présent » : l'année seule ne dit pas que la période est ouverte.
   // Le marqueur doit rejoindre la plage avant d'être retiré de l'intitulé.
   const isCurrent = PRESENT_RE.test(titleLine)
@@ -71,18 +74,26 @@ export function entryParts(titleLine, restLines = []) {
   }
   const description = restLines.join(' ').trim()
   let range = onRanges && onRanges.length > 0 ? onRanges.join(' - ') : ''
-  if (isCurrent) range = range ? `${range} - Présent` : 'Présent'
+  // Le libellé de période ouverte est restitué dans la langue du CV : inscrire
+  // « Présent » sur un CV anglais produit un mélange dans le formulaire.
+  if (isCurrent) {
+    const label = lang === 'en' ? 'Present' : 'Présent'
+    range = range ? `${range} - ${label}` : label
+  }
   return { position, company, location, date_range: range, description }
 }
 
 /** Découpe « élément | sous-élément » pour les sections non poste/entreprise. */
 export function splitTitleParts(line) {
+  // Seuls les séparateurs situés aux extrémités sont retirés : ceux du milieu
+  // séparent le diplôme de l'établissement. Retirer tous les tirets espaces
+  // confondait « Master Informatique - Université Paris-Saclay » en un seul bloc.
   const clean = line
     .replace(/[()[\]]/g, ' ')
     .replace(YEAR_RANGE_RE, ' ')
     .replace(YEAR_RE, ' ')
-    .replace(LOOSE_DASH_RE, ' ')
     .replace(/\s+/g, ' ')
+    .replace(/^[\s|–—-]+|[\s|–—-]+$/g, '')
     .trim()
   const segments = clean.split(TITLE_SEP_RE).map((s) => s.trim()).filter(Boolean)
   const head = segments[0] || ''
