@@ -15,6 +15,11 @@ export const generateCv = (id) => api.post(`/cvs/${id}/generate/`)
 export const adaptCv = (id, jobOffer) =>
   api.post(`/cvs/${id}/adapt/`, { job_offer: jobOffer })
 
+// L'import crée un nouveau CV (design repris de la source) : le CV courant
+// n'est jamais modifié.
+export const importCv = (id, content) =>
+  api.post(`/cvs/${id}/import/`, { content })
+
 export const previewCv = (id) =>
   api.get(`/cvs/${id}/preview/`, { responseType: 'text' })
 

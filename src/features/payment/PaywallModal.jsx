@@ -1,6 +1,8 @@
 import { useEffect } from 'react'
 import Button from '../../components/ui/Button'
-import { useSubscribe } from './usePayments'
+import { usePlans, useSubscribe } from './usePayments'
+
+const formatCfa = (amount) => new Intl.NumberFormat('fr-FR').format(amount ?? 0)
 
 export default function PaywallModal({
   open,
@@ -10,6 +12,7 @@ export default function PaywallModal({
   onSuccess,
 }) {
   const subscribe = useSubscribe()
+  const { data: plans } = usePlans()
 
   useEffect(() => {
     if (open) {
@@ -19,6 +22,10 @@ export default function PaywallModal({
   }, [open])
 
   if (!open) return null
+
+  // Le prix vient de l'API : le hardcoder ici avait déjà produit un tarif faux
+  // affiché juste avant le checkout.
+  const premium = plans?.find((p) => p.slug === 'premium')
 
   const handleSubscribe = async () => {
     await subscribe.mutateAsync('premium')
@@ -44,16 +51,18 @@ export default function PaywallModal({
 
         <div className="mt-5 space-y-3">
           <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-4">
               <div>
                 <p className="font-semibold text-slate-900">Abonnement Premium</p>
                 <p className="text-sm text-slate-500">
-                  Création et génération de CV, tous les modèles, PDF illimités,
-                  ATS, adaptation et lettres de motivation.
+                  PDF sans filigrane, création par prompt, tous les modèles,
+                  adaptation et lettres de motivation.
                 </p>
               </div>
-              <div className="text-right">
-                <p className="text-lg font-bold text-indigo-700">3 000 FCFA</p>
+              <div className="shrink-0 text-right">
+                <p className="text-lg font-bold text-indigo-700">
+                  {premium ? `${formatCfa(premium.amount_cfa)} FCFA` : '—'}
+                </p>
                 <p className="text-xs text-slate-500">/ mois</p>
               </div>
             </div>

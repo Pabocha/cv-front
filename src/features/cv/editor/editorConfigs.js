@@ -339,18 +339,45 @@ export function composeDate(value, lang = 'fr') {
 export function parsePeriod(value) {
   const empty = { startMonth: '', startYear: '', endMonth: '', endYear: '', current: false }
   if (!value || typeof value !== 'string') return empty
-  const parts = value.split(/\s*-\s*/).filter(Boolean)
+  // « Présent », « En cours », « Currently » marquent une période ouverte.
+  const current = /aujourd|today|present|présent|actuel|en cours|currently|current|now/i.test(value)
+  const parts = value
+    .split(/\s*(?:–|—|-|\/|,)\s*/)
+    .filter((part) => part.trim() && !/aujourd|today|present|présent|actuel|en cours|currently|current|now/i.test(part))
   const start = parsePart(parts[0])
-  const current = /aujourd|today|present|actuel/i.test(value)
-  let end = { month: '', year: '' }
-  if (!current && parts.length > 1) end = parsePart(parts[1])
-  return { ...start, ...end, current }
+  const end = !current && parts.length > 1 ? parsePart(parts[1]) : { month: '', year: '' }
+  // `end` ne remplace `start` que s'il porte réellement une information, sinon
+  // une période ouverte effacerait la date de début.
+  return {
+    startMonth: start.month,
+    startYear: start.year,
+    endMonth: end.month,
+    endYear: end.year,
+    current,
+  }
 }
 
 export function parseDate(value) {
   if (!value || typeof value !== 'string') return { month: '', year: '' }
   return parsePart(value)
 }
+
+// « janv. », « sept. », « oct. » : les mois abrégés ne sont pas des sous-chaînes
+// des mois complets, il faut donc les connaître à part.
+const MONTH_ABBREVIATIONS = [
+  'janv',
+  'fevr',
+  'mars',
+  'avr',
+  'mai',
+  'juin',
+  'juil',
+  'aout',
+  'sept',
+  'octo',
+  'nov',
+  'dece',
+]
 
 function parsePart(part) {
   const result = { month: '', year: '' }
@@ -359,7 +386,10 @@ function parsePart(part) {
   if (yearMatch) result.year = yearMatch[1]
   const lower = part.toLowerCase()
   for (let i = 0; i < 12; i += 1) {
-    if (lower.includes(MONTH_NAMES.fr[i].toLowerCase()) || lower.includes(MONTH_NAMES.en[i].toLowerCase())) {
+    const fr = MONTH_NAMES.fr[i].toLowerCase()
+    const en = MONTH_NAMES.en[i].toLowerCase()
+    const short = MONTH_ABBREVIATIONS[i]
+    if (lower.includes(fr) || lower.includes(en) || lower.includes(short)) {
       result.month = String(i + 1)
       break
     }

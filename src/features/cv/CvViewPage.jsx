@@ -1,25 +1,26 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useCv, useGenerateCv, usePdfCv } from './useCvs'
+import { useEntitlements } from '../payment/usePayments'
 import { previewCv } from '../../api/cvs'
 import Button from '../../components/ui/Button'
-import PaywallModal from '../payment/PaywallModal'
 
 export default function CvViewPage() {
   const { id } = useParams()
   const { data: cv, isLoading } = useCv(id)
   const generate = useGenerateCv()
   const downloadPdf = usePdfCv()
+  const { data: entitlements } = useEntitlements()
   const iframeRef = useRef(null)
   const [previewHtml, setPreviewHtml] = useState(null)
   const [previewLoading, setPreviewLoading] = useState(false)
-  const [paywallOpen, setPaywallOpen] = useState(false)
 
-  useEffect(() => {
-    if (downloadPdf.isError && downloadPdf.error?.response?.status === 402) {
-      setPaywallOpen(true)
-    }
-  }, [downloadPdf.isError, downloadPdf.error])
+  // L'export n'est jamais refusé : le quota de PDF propres restants décide
+  // seulement si le fichier porte un filigrane.
+  const cleanRemaining = entitlements?.clean_pdfs_remaining
+  const unlimited = cleanRemaining === null
+  const cleanLeft = typeof cleanRemaining === 'number' ? cleanRemaining : null
+  const lastPdfWasWatermarked = downloadPdf.data?.watermarked === true
 
   const handlePreview = async () => {
     setPreviewLoading(true)
@@ -43,11 +44,6 @@ export default function CvViewPage() {
     }
     await generate.mutateAsync(id)
     setPreviewHtml(null)
-  }
-
-  const handlePdfSuccess = () => {
-    setPaywallOpen(false)
-    downloadPdf.mutate(id)
   }
 
   if (isLoading) {
@@ -128,16 +124,18 @@ export default function CvViewPage() {
         </p>
       )}
 
-      <PaywallModal
-        open={paywallOpen}
-        onClose={() => {
-          setPaywallOpen(false)
-          downloadPdf.reset()
-        }}
-        title="Export PDF Premium"
-        message="Le téléchargement du PDF est réservé aux abonnés Premium. Activez une offre pour y accéder."
-        onSuccess={handlePdfSuccess}
+      <PdfQuotaNotice
+        unlimited={unlimited}
+        cleanLeft={cleanLeft}
+        watermarked={lastPdfWasWatermarked}
       />
+
+      {downloadPdf.isError && (
+        <p className="text-sm text-red-600">
+          {downloadPdf.error?.response?.data?.detail ||
+            'Erreur lors du téléchargement.'}
+        </p>
+      )}
 
       {previewHtml !== null && (
         <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
@@ -169,6 +167,38 @@ export default function CvViewPage() {
           Le contenu n'a pas encore été généré. Cliquez sur « Générer le contenu »
           pour créer votre CV à partir de vos informations de profil.
         </div>
+      )}
+    </div>
+  )
+}
+
+function PdfQuotaNotice({ unlimited, cleanLeft, watermarked }) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm">
+      <p className="text-slate-600">
+        {unlimited ? (
+          <>Export PDF illimité, sans filigrane.</>
+        ) : (
+          <>
+            Il vous reste{' '}
+            <strong>
+              {cleanLeft ?? 0} PDF sans filigrane
+            </strong>{' '}
+            ce mois-ci. Vos téléchargements suivants restent possibles, mais
+            portent la mention « version gratuite ».
+          </>
+        )}
+      </p>
+      {watermarked && (
+        <p className="mt-2 text-amber-700">
+          Votre dernier PDF portait le filigrane. La marque disparaît avec
+          l&apos;offre Premium.
+        </p>
+      )}
+      {!unlimited && cleanLeft === 0 && (
+        <Link to="/pricing" className="mt-2 inline-block font-medium text-indigo-600 hover:underline">
+          Découvrir l&apos;offre Premium
+        </Link>
       )}
     </div>
   )

@@ -3,49 +3,29 @@ import { Link } from 'react-router-dom'
 import { Footer } from '../layouts/PublicLayout'
 import Button from '../components/ui/Button'
 import { useAuth } from '../features/auth/AuthContext'
-import { useEntitlements, useSubscribe } from '../features/payment/usePayments'
+import {
+  useEntitlements,
+  usePlans,
+  useSubscribe,
+} from '../features/payment/usePayments'
 
-const PLANS = [
-  {
-    slug: 'premium',
-    name: 'Premium',
-    price: '3 000 FCFA',
-    period: '/ mois',
-    highlight: true,
-    features: [
-      'Compte personnel gratuit',
-      'Création et génération de CV illimitées',
-      'Tous les modèles (6 styles)',
-      'Téléchargement PDF illimité',
-      'Analyse ATS illimitée',
-      'Adaptation à une offre illimitée',
-      '2 lettres de motivation / mois',
-      'Support prioritaire',
-    ],
-  },
-  {
-    slug: 'premium-plus',
-    name: 'Premium+',
-    price: '5 000 FCFA',
-    period: '/ mois',
-    highlight: false,
-    features: [
-      'Tout Premium, sans limite',
-      'Lettres de motivation illimitées',
-      'Adaptations et analyses illimitées',
-      'Support prioritaire renforcé',
-      'Nouveaux modèles en avant-première',
-    ],
-  },
-]
+const formatCfa = (amount) => new Intl.NumberFormat('fr-FR').format(amount ?? 0)
+
+// Les libellés de fonctionnalités vivent en base et sont servis par
+// /payments/plans/ : aucun prix ni texte d'offre n'est codé en dur ici.
+const PERIODS = { month: '/ mois', year: '/ an' }
 
 export default function PricingPage() {
   const { user } = useAuth()
   const entitlements = useEntitlements()
+  const plansQuery = usePlans()
   const subscribe = useSubscribe()
   const [activated, setActivated] = useState(null)
   const isPremium = entitlements.data?.is_premium
   const activePlan = entitlements.data?.plan_slug
+
+  const plans = plansQuery.data || []
+  const guestPrice = plans.find((p) => p.slug === 'guest')?.amount_cfa ?? 3000
 
   const handleActivate = async (slug) => {
     await subscribe.mutateAsync(slug)
@@ -60,9 +40,10 @@ export default function PricingPage() {
             Des tarifs simples et accessibles
           </h1>
           <p className="mt-4 text-indigo-100">
-            La création de compte est gratuite. Toutes les fonctionnalités de CV
-            (création, génération, PDF, ATS, lettres) nécessitent une offre
-            Premium. Paiement simulé en démo — sans engagement, résiliable à tout
+            Le compte gratuit permet de créer, modifier et analyser vos CV, avec
+            un PDF sans filigrane chaque mois. L&apos;offre Premium lève le
+            filigrane, ouvre la création par prompt et l&apos;adaptation aux
+            offres. Paiement simulé en démo — sans engagement, résiliable à tout
             moment.
           </p>
         </div>
@@ -71,13 +52,14 @@ export default function PricingPage() {
       <section className="bg-slate-50 py-16">
         <div className="mx-auto max-w-4xl px-6">
           <div className="grid gap-6 md:grid-cols-2">
-            {PLANS.map((plan) => {
+            {plans.map((plan) => {
               const isActive = isPremium && activePlan === plan.slug
+              const highlight = plan.slug === 'premium'
               return (
                 <div
                   key={plan.slug}
                   className={`rounded-2xl border bg-white p-8 ${
-                    plan.highlight
+                    highlight
                       ? 'border-indigo-600 shadow-lg ring-2 ring-indigo-600'
                       : 'border-slate-200'
                   }`}
@@ -94,12 +76,19 @@ export default function PricingPage() {
                   </div>
                   <div className="mt-2">
                     <span className="text-3xl font-bold text-slate-900">
-                      {plan.price}
+                      {formatCfa(plan.amount_cfa)} FCFA
                     </span>
-                    <span className="text-sm text-slate-500">{plan.period}</span>
+                    <span className="text-sm text-slate-500">
+                      {PERIODS[plan.interval] || ''}
+                    </span>
                   </div>
+                  {plan.description && (
+                    <p className="mt-2 text-sm text-slate-500">
+                      {plan.description}
+                    </p>
+                  )}
                   <ul className="mt-5 space-y-2 text-sm text-slate-600">
-                    {plan.features.map((feat) => (
+                    {(plan.features || []).map((feat) => (
                       <li key={feat} className="flex gap-2">
                         <span className="text-green-600">✓</span>
                         {feat}
@@ -110,7 +99,7 @@ export default function PricingPage() {
                     <Link
                       to="/register"
                       className={`mt-6 block rounded-lg py-2.5 text-center text-sm font-medium ${
-                        plan.highlight
+                        highlight
                           ? 'bg-indigo-600 text-white hover:bg-indigo-700'
                           : 'border border-indigo-600 text-indigo-600 hover:bg-indigo-50'
                       }`}
@@ -124,7 +113,7 @@ export default function PricingPage() {
                   ) : (
                     <Button
                       className="mt-6 w-full"
-                      variant={plan.highlight ? 'primary' : 'secondary'}
+                      variant={highlight ? 'primary' : 'secondary'}
                       onClick={() => handleActivate(plan.slug)}
                       disabled={subscribe.isPending}
                     >
@@ -137,6 +126,12 @@ export default function PricingPage() {
               )
             })}
           </div>
+
+          {plansQuery.isError && (
+            <p className="mt-4 text-center text-sm text-red-600">
+              Impossible de charger les tarifs. Rechargez la page.
+            </p>
+          )}
 
           {subscribe.isError && (
             <p className="mt-4 text-center text-sm text-red-600">
@@ -164,8 +159,8 @@ export default function PricingPage() {
             </h3>
             <p className="mt-2 text-sm text-slate-600">
               Créez un seul CV sans créer de compte : décrivez votre parcours,
-              choisissez un modèle, payez 3 000 FCFA et téléchargez le PDF
-              (lien valable 48 h).
+              payez {formatCfa(guestPrice)} FCFA et téléchargez le PDF (lien
+              valable 48 h). Créez ensuite un compte gratuit pour le modifier.
             </p>
             <Link
               to="/creer-cv"

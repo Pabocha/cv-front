@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Footer } from '../layouts/PublicLayout'
 import { getTemplateThumbnailUrl } from '../api/templates'
+import { usePlans } from '../features/payment/usePayments'
 
 const TEMPLATES_HIGHLIGHT = [
   { slug: 'professionnel', name: 'Professionnel' },
@@ -75,58 +76,16 @@ const FEATURES = [
   },
 ]
 
-const PLANS = [
-  {
-    name: 'Premium',
-    price: '3 000 FCFA',
-    period: '/ mois',
-    highlight: true,
-    features: [
-      'Création et génération de CV illimitées',
-      'Tous les modèles (6 styles)',
-      'Téléchargement PDF illimité',
-      'Analyse ATS et adaptation illimitées',
-      '2 lettres de motivation / mois',
-      'Support prioritaire',
-    ],
-    cta: 'Découvrir les options',
-    to: '/pricing',
-  },
-  {
-    name: 'Premium+',
-    price: '5 000 FCFA',
-    period: '/ mois',
-    highlight: false,
-    features: [
-      'Tout le Premium, sans limite',
-      'Lettres de motivation illimitées',
-      'Support prioritaire renforcé',
-      'Nouveaux modèles en avant-première',
-    ],
-    cta: 'Découvrir les options',
-    to: '/pricing',
-  },
-  {
-    name: 'À la carte',
-    price: '3 000 FCFA',
-    period: ' / CV',
-    highlight: false,
-    features: [
-      'Sans compte, sans abonnement',
-      'Génération de votre CV à partir d’une description',
-      'Choix parmi les 6 modèles',
-      'Téléchargement PDF en 1 clic',
-      'Lien valable 48 h',
-    ],
-    cta: 'Créer mon CV sans compte',
-    to: '/creer-cv',
-  },
-]
+// Le montant du CV à l'unité est le seul prix qui ne vient pas de /plans/ :
+// il n'est pas une offre, c'est un paiement unique attaché à une description.
+const GUEST_FALLBACK_CFA = 3000
+
+const formatCfa = (amount) => new Intl.NumberFormat('fr-FR').format(amount ?? 0)
 
 const FAQ = [
   {
     q: 'Est-ce que je peux créer plusieurs CV ?',
-    a: 'Oui. Vous pouvez créer plusieurs CV, chacun avec un poste visé et un modèle différent, pour cibler plusieurs candidatures.',
+    a: 'Oui. Le compte gratuit permet de créer et modifier autant de CV que vous le souhaitez, chacun avec un poste visé et un modèle différent. Chaque export PDF reste possible : au-delà du quota mensuel sans filigrane, le fichier porte simplement la mention « version gratuite ».',
   },
   {
     q: 'Mes informations restent-elles confidentielles ?',
@@ -141,20 +100,20 @@ const FAQ = [
     a: 'Oui : collez le descriptif de l’offre, et le système réorganise vos informations en conséquence — sans jamais inventer de compétence.',
   },
   {
+    q: 'Qu’est-ce qui est gratuit, exactement ?',
+    a: 'Le compte gratuit ouvre la création et l’édition de CV, la génération depuis votre profil, l’aperçu et l’analyse ATS. Aucun de ces usages n’est bloqué. Le seul élément bridé est l’export PDF : un fichier sans filigrane par mois, puis des exports marqués « version gratuite ».',
+  },
+  {
     q: 'Comment fonctionne le paiement ?',
-    a: 'La création de compte est gratuite, mais toutes les fonctionnalités de CV nécessitent une offre Premium (3 000 FCFA/mois) ou Premium+ (5 000 FCFA/mois), activable en 2 clics. Sans compte, vous pouvez aussi payer 3 000 FCFA à la carte pour un seul CV. Le paiement est simulé dans cette démo (Wave, mobile money et carte en production).',
+    a: 'L’abonnement Premium se règle en 2 clics et retire le filigrane, ouvre la création de CV à partir d’un prompt, l’adaptation à une offre et les lettres de motivation. Sans compte, un paiement unique donne droit à un CV. Le paiement est simulé dans cette démo (Wave, mobile money et carte en production).',
   },
   {
     q: 'Puis-je créer un CV sans compte ?',
-    a: 'Oui : décrivez votre parcours, choisissez un modèle et payez à la carte (3 000 FCFA) pour télécharger le PDF immédiatement. Le lien de téléchargement reste valable 48 h.',
+    a: 'Oui : décrivez votre parcours, payez à la carte et téléchargez le PDF. Le lien reste valable 48 h. Si vous créez ensuite un compte gratuit, vous pouvez conserver ce CV et le modifier.',
   },
   {
-    q: 'Sans abonnement, puis-je tout de même créer mon CV ?',
-    a: 'Oui via l’option à la carte sans compte, ou en commandant votre CV sur WhatsApp : notre équipe le crée pour vous et vous payez à la livraison.',
-  },
-  {
-    q: 'Combien de lettres de motivation puis-je générer ?',
-    a: 'Le forfait Premium inclut 2 lettres par mois, rédigées uniquement à partir de vos informations réelles. Premium+ permet des lettres illimitées.',
+    q: 'Le filigrane sur mes PDF gêne-t-il les recruteurs ?',
+    a: 'Il s’agit d’une mention discrète en diagonale. Le contenu reste parfaitement lisible et le CV est envoyé normalement. L’abonnement Premium la supprime sur tous vos exports.',
   },
   {
     q: 'Je ne sais pas créer de CV, que faire ?',
@@ -180,6 +139,9 @@ export default function LandingPage() {
 }
 
 function Hero() {
+  const { data: plans } = usePlans()
+  const premiumPrice = plans?.find((p) => p.slug === 'premium')?.amount_cfa
+
   return (
     <section className="relative overflow-hidden bg-gradient-to-br from-indigo-600 via-indigo-600 to-indigo-800">
       <div className="mx-auto max-w-3xl px-6 pb-24 pt-20 text-center text-white">
@@ -207,7 +169,14 @@ function Hero() {
         <div className="mt-10 grid grid-cols-3 gap-4 text-sm text-indigo-100">
           <Stat value="6+" label="Modèles professionnels" />
           <Stat value="100%" label="Compatibles ATS" />
-          <Stat value="3 000 FCFA" label="Tarif Premium mensuel" />
+          <Stat
+            value={
+              premiumPrice
+                ? `${formatCfa(premiumPrice)} FCFA`
+                : `${formatCfa(GUEST_FALLBACK_CFA)} FCFA`
+            }
+            label="Tarif Premium mensuel"
+          />
         </div>
       </div>
     </section>
@@ -394,6 +363,40 @@ function Rec({ line }) {
 }
 
 function Pricing() {
+  const { data: plans } = usePlans()
+  const guestPrice = GUEST_FALLBACK_CFA
+
+  // Les offres viennent de l'API : le prix du CV à la carte n'est pas une offre
+  // (c'est un paiement unique), donc il reste dans la carte dédiée.
+  const cards = [
+    ...(plans || []).map((plan) => ({
+      key: plan.slug,
+      name: plan.name,
+      price: `${formatCfa(plan.amount_cfa)} FCFA`,
+      period: plan.interval === 'year' ? '/ an' : '/ mois',
+      highlight: plan.slug === 'premium',
+      features: plan.features || [],
+      cta: 'Découvrir les options',
+      to: '/pricing',
+    })),
+    {
+      key: 'guest',
+      name: 'À la carte',
+      price: `${formatCfa(guestPrice)} FCFA`,
+      period: ' / CV',
+      highlight: false,
+      features: [
+        'Sans compte, sans abonnement',
+        'Génération de votre CV à partir d’une description',
+        'Choix parmi les 6 modèles',
+        'Téléchargement PDF en 1 clic',
+        'Lien valable 48 h',
+      ],
+      cta: 'Créer mon CV sans compte',
+      to: '/creer-cv',
+    },
+  ]
+
   return (
     <section id="tarifs" className="bg-slate-50 py-16">
       <div className="mx-auto max-w-4xl px-6">
@@ -401,13 +404,14 @@ function Pricing() {
           Des tarifs simples et accessibles
         </h2>
         <p className="mx-auto mt-2 max-w-xl text-center text-slate-500">
-          Un compte gratuit, et toutes les fonctionnalités incluses dans une
-          offre Premium. Sans compte, payez à la carte pour un seul CV.
+          Créer, modifier et analyser vos CV est gratuit. Premium retire le
+          filigrane des PDF et ouvre la création par prompt. Sans compte, payez à
+          la carte pour un seul CV.
         </p>
         <div className="mt-10 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {PLANS.map((plan) => (
+          {cards.map((plan) => (
             <div
-              key={plan.name}
+              key={plan.key}
               className={`rounded-2xl border p-8 ${
                 plan.highlight
                   ? 'border-indigo-600 bg-white shadow-lg ring-2 ring-indigo-600'

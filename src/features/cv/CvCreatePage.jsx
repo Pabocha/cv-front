@@ -149,7 +149,7 @@ export default function CvCreatePage() {
         open={paywallOpen}
         onClose={() => setPaywallOpen(false)}
         title="Templates Premium"
-        message="Les modèles Premium sont réservés aux abonnés. Abonnez-vous à Premium (3 000 FCFA/mois) pour profiter de tous les modèles."
+        message="Les modèles Premium sont réservés aux abonnés. Activez une offre pour tous les utiliser, avec des exports PDF sans filigrane et sans limite."
         onSuccess={() => setPaywallOpen(false)}
       />
     </div>

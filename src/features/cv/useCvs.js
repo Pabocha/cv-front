@@ -8,6 +8,7 @@ import {
   generateCv,
   previewCv,
   pdfCv,
+  importCv,
 } from '../../api/cvs'
 import { getTemplates } from '../../api/templates'
 
@@ -80,6 +81,19 @@ export function useGenerateCv() {
   })
 }
 
+// L'import renvoie `{ cv, preview_html }` : on invalide la liste (le nouveau CV
+// y apparaît) et la source, dont le statut vient de changer.
+export function useImportCv() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, content }) => importCv(id, content),
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({ queryKey: ['cvs'] })
+      qc.invalidateQueries({ queryKey: ['cvs', variables.id] })
+    },
+  })
+}
+
 export function usePreviewCv() {
   return useMutation({
     mutationFn: async (id) => {
@@ -90,17 +104,29 @@ export function usePreviewCv() {
 }
 
 export function usePdfCv() {
+  const qc = useQueryClient()
   return useMutation({
     mutationFn: async (id) => {
-      const { data } = await pdfCv(id)
+      const { data, headers } = await pdfCv(id)
       const url = window.URL.createObjectURL(data)
       const a = document.createElement('a')
       a.href = url
-      a.download = 'cv.pdf'
+      a.download = filenameFrom(headers['content-disposition']) || 'cv.pdf'
       document.body.appendChild(a)
       a.click()
       a.remove()
       window.URL.revokeObjectURL(url)
+      // Le backend signale dans l'en-tête si le fichier porte un filigrane, et
+      // le compteur de PDF propres a changé : on renvoie les deux à l'appelant.
+      return { watermarked: headers['x-cv-watermarked'] === '1' }
     },
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ['entitlements'] }),
   })
+}
+
+/** Extrait le nom de fichier de l'en-tête Content-Disposition. */
+function filenameFrom(disposition) {
+  const match = /filename="?([^";]+)"?/.exec(disposition || '')
+  return match ? match[1] : null
 }

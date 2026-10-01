@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { useAuth } from '../features/auth/AuthContext'
+import { guestClaim } from '../api/guest'
+import { clearGuestToken, getGuestToken } from '../features/guest/guestToken'
 import Button from '../components/ui/Button'
 import Input from '../components/ui/Input'
 
@@ -15,6 +17,28 @@ export default function RegisterPage() {
   })
   const [errors, setErrors] = useState({})
   const [loading, setLoading] = useState(false)
+  const [claimed, setClaimed] = useState(null)
+
+  // Le panneau « réclamé » passe avant la redirection : la réclamation rend le
+  // visiteur connecté, donc `user` est déjà renseigné à ce moment-là.
+  if (claimed) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+        <div className="w-full max-w-sm space-y-4 text-center">
+          <h1 className="text-2xl font-bold text-slate-900">
+            Bienvenue, votre CV vous attend
+          </h1>
+          <p className="text-sm text-slate-600">{claimed.message}</p>
+          <Button
+            className="w-full"
+            onClick={() => window.location.assign(claimed.url)}
+          >
+            Modifier mon CV
+          </Button>
+        </div>
+      </div>
+    )
+  }
 
   if (user) return <Navigate to="/pricing" replace />
 
@@ -24,6 +48,19 @@ export default function RegisterPage() {
     setLoading(true)
     try {
       await register(form)
+      // Le visiteur qui a payé 3 000 FCFA avant de s'inscrire ne doit pas
+      // perdre son CV : on le réclame immédiatement après la création du
+      // compte. Le token est effacé seulement en cas de succès.
+      const token = getGuestToken()
+      if (token) {
+        try {
+          const { data } = await guestClaim(token)
+          clearGuestToken()
+          setClaimed(data)
+        } catch {
+          /* le token reste en localStorage : la page /creer-cv réessaiera */
+        }
+      }
     } catch (err) {
       const data = err.response?.data
       if (data) setErrors(data)

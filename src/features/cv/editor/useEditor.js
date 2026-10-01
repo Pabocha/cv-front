@@ -20,7 +20,6 @@ export default function useEditor(id) {
   const [liveHtml, setLiveHtml] = useState('')
   const [saveState, setSaveState] = useState('idle')
   const [saveError, setSaveError] = useState('')
-  const [paywall, setPaywall] = useState(false)
 
   const draftRef = useRef(null)
   const past = useRef([])
@@ -84,7 +83,6 @@ export default function useEditor(id) {
       setSaveState('saved')
     } catch (err) {
       setSaveState('error')
-      if (err?.response?.status === 402) setPaywall(true)
       const detail = err?.response?.data?.detail
       setSaveError(detail || 'Enregistrement impossible. Réessayez.')
     } finally {
@@ -130,6 +128,9 @@ export default function useEditor(id) {
 
   useEffect(() => {
     if (!cv) return
+    // Changer de CV sans remonter le composant laisse le timer d'autosave armé :
+    // il partirait sur l'id de la closure (l'ancien CV) avec le nouveau brouillon.
+    window.clearTimeout(saveTimer.current)
     const slug = cv.template || 'professionnel'
     const content = cv.generated_content || {
       header: {},
@@ -160,7 +161,6 @@ export default function useEditor(id) {
     setDraft(initial)
     setSaveState('idle')
     setSaveError('')
-    setPaywall(false)
     lastSavedKey.current = ''
     previewCv(cv.id)
       .then(({ data }) => mounted.current && setLiveHtml(data))
@@ -361,7 +361,6 @@ export default function useEditor(id) {
     [],
   )
 
-  const clearPaywall = useCallback(() => setPaywall(false), [])
 
   const flushNow = useCallback(async () => {
     if (draftRef.current) await flushSave()
@@ -375,7 +374,6 @@ export default function useEditor(id) {
     liveHtml,
     saveState,
     saveError,
-    paywall,
     canUndo,
     canRedo,
     undo,
@@ -394,7 +392,6 @@ export default function useEditor(id) {
     togglePageBreak,
     updateStyle,
     updateLanguage,
-    clearPaywall,
     flushNow,
   }
 }

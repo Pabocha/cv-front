@@ -1,6 +1,6 @@
-import { lazy, Suspense, useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
-import { useTemplates, usePdfCv } from './useCvs'
+import { lazy, Suspense, useState } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useTemplates, usePdfCv, useImportCv } from './useCvs'
 import { getTemplateThumbnailUrl } from '../../api/templates'
 import {
   DndContext,
@@ -227,6 +227,7 @@ function SortableSectionCard({
 
 export default function CvEditPage() {
   const { id } = useParams()
+  const navigate = useNavigate()
   const editor = useEditor(id)
   const { data: templatesData } = useTemplates()
   const templates = templatesData || []
@@ -234,15 +235,10 @@ export default function CvEditPage() {
   const { data: entitlements } = useEntitlements()
   const isPremium = entitlements?.is_premium
   const downloadPdf = usePdfCv()
+  const importCv = useImportCv()
   const [importOpen, setImportOpen] = useState(false)
+  const [importError, setImportError] = useState('')
   const [templatePaywallOpen, setTemplatePaywallOpen] = useState(false)
-  const [pdfPaywallOpen, setPdfPaywallOpen] = useState(false)
-
-  useEffect(() => {
-    if (downloadPdf.isError && downloadPdf.error?.response?.status === 402) {
-      setPdfPaywallOpen(true)
-    }
-  }, [downloadPdf.isError, downloadPdf.error])
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -286,26 +282,35 @@ export default function CvEditPage() {
     downloadPdf.mutate(cv.id)
   }
 
-  const handleApplyImport = (parsed) => {
-    if (
-      cv.status !== 'draft' &&
-      !window.confirm(
-        "L'import remplacera le contenu actuel (y compris vos modifications personnalisées) par celui de votre fichier. Continuer ?",
-      )
-    ) {
-      return
+  const handleApplyImport = async (parsed) => {
+    // L'import ne modifie JAMAIS le CV courant : il crée un nouveau CV qui
+    // reprend son design (template, layout, style, langue). Le CV affiché reste
+    // donc inchangé jusqu'à la redirection.
+    const content = {
+      header: parsed.header || {},
+      summary: parsed.summary || '',
+      experiences: [],
+      educations: [],
+      skills: [],
+      languages: [],
+      certifications: [],
+      projects: [],
+      interests: [],
     }
-    const content = editor.draft.content
-    Object.entries(parsed.header || {}).forEach(([field, value]) => {
-      if (value) editor.updateHeader(field, value)
-    })
-    editor.updateSummary(parsed.summary || '')
     Object.entries(parsed.sections || {}).forEach(([key, items]) => {
-      const current = Array.isArray(content[key]) ? content[key] : []
-      for (let i = current.length - 1; i >= 0; i -= 1) editor.removeSectionItem(key, i)
-      items.forEach((item) => editor.addSectionItem(key, item))
+      // `summary` est une chaîne, pas une section : l'appliquer ici planterait.
+      if (key === 'summary' || !Array.isArray(items)) return
+      content[key] = items
     })
-    setImportOpen(false)
+    try {
+      const { data } = await importCv.mutateAsync({ id: cv.id, content })
+      // `CvEditRoute` monte l'éditeur avec `key={id}` : changer d'id démonte donc
+      // l'instance et annule son autosave, sans risque d'écrire le contenu
+      // importé sur le CV d'origine.
+      navigate(`/cv/${data.cv.id}/edit`)
+    } catch (err) {
+      setImportError(err?.response?.data?.detail || "L'import a échoué.")
+    }
   }
 
   return (
@@ -344,7 +349,14 @@ export default function CvEditPage() {
             <option value="fr">Français</option>
             <option value="en">English</option>
           </select>
-          <Button variant="secondary" className="text-xs" onClick={() => setImportOpen(true)}>
+          <Button
+            variant="secondary"
+            className="text-xs"
+            onClick={() => {
+              setImportError('')
+              setImportOpen(true)
+            }}
+          >
             Importer
           </Button>
           <Button
@@ -488,40 +500,11 @@ export default function CvEditPage() {
       )}
 
       <PaywallModal
-        open={editor.paywall}
-        onClose={() => {
-          editor.clearPaywall()
-          editor.flushNow()
-        }}
-        title="Éditeur Premium"
-        message="La personnalisation de votre CV est réservée aux abonnés Premium. Activez une offre pour enregistrer vos modifications."
-        onSuccess={() => {
-          editor.clearPaywall()
-          editor.flushNow()
-        }}
-      />
-
-      <PaywallModal
         open={templatePaywallOpen}
         onClose={() => setTemplatePaywallOpen(false)}
         title="Modèles Premium"
-        message="Les modèles Premium sont réservés aux abonnés. Abonnez-vous à Premium (3 000 FCFA/mois) pour profiter de tous les modèles."
+        message="Les modèles Premium sont réservés aux abonnés. Activez une offre pour tous les utiliser sans filigrane ni limite d'export."
         onSuccess={() => setTemplatePaywallOpen(false)}
-      />
-
-      <PaywallModal
-        open={pdfPaywallOpen}
-        onClose={() => {
-          setPdfPaywallOpen(false)
-          downloadPdf.reset()
-        }}
-        title="Export PDF Premium"
-        message="Le téléchargement du PDF est réservé aux abonnés Premium. Activez une offre pour y accéder."
-        onSuccess={() => {
-          setPdfPaywallOpen(false)
-          downloadPdf.reset()
-          handlePdfDownload()
-        }}
       />
 
       {importOpen && (
@@ -530,6 +513,8 @@ export default function CvEditPage() {
             open
             onClose={() => setImportOpen(false)}
             onApply={handleApplyImport}
+            pending={importCv.isPending}
+            error={importError}
           />
         </Suspense>
       )}

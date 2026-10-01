@@ -3,8 +3,6 @@ import { Link, useParams } from 'react-router-dom'
 import { useCv } from '../cv/useCvs'
 import { useAtsAnalysis, useAtsReports } from './useAts'
 import Button from '../../components/ui/Button'
-import PaywallModal from '../payment/PaywallModal'
-import PremiumGate from '../payment/PremiumGate'
 
 function scoreColor(score) {
   if (score >= 75) return 'bg-green-100 text-green-800 border-green-200'
@@ -33,7 +31,6 @@ export default function AtsPage() {
   const { data: reports, refetch: refetchReports } = useAtsReports(id)
   const [offer, setOffer] = useState('')
   const [result, setResult] = useState(null)
-  const [paywallOpen, setPaywallOpen] = useState(false)
 
   const handleAnalyze = async () => {
     const res = await analyze.mutateAsync({ id, jobOffer: offer })
@@ -58,6 +55,7 @@ export default function AtsPage() {
         <h1 className="mt-2 text-2xl font-bold text-slate-900">Analyse ATS</h1>
         <p className="mt-1 text-sm text-slate-500">
           Collez une offre d'emploi pour mesurer la compatibilité avec « {cv?.title} ».
+          L'analyse est gratuite pour tous les comptes, y compris le compte gratuit.
         </p>
       </div>
 
@@ -71,52 +69,40 @@ export default function AtsPage() {
         </div>
       )}
 
-      <PremiumGate
-        title="Analyse ATS"
-        message="L'analyse de compatibilité avec les offres d'emploi est réservée aux abonnés Premium."
-      >
-        <div>
-          <label className="mb-1 block text-sm font-medium text-slate-700">
-            Offre d'emploi
-          </label>
-          <textarea
-            value={offer}
-            onChange={(e) => setOffer(e.target.value)}
-            rows={8}
-            placeholder="Collez ici le descriptif complet de l'offre d'emploi…"
-            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
-          />
-          <div className="mt-3 flex items-center gap-4">
-            <Button
-              onClick={handleAnalyze}
-              disabled={analyze.isPending || offer.trim().length < 20 || cv?.status !== 'generated'}
-            >
-              {analyze.isPending ? 'Analyse en cours…' : 'Analyser la compatibilité'}
+      <div>
+        <label className="mb-1 block text-sm font-medium text-slate-700">
+          Offre d'emploi
+        </label>
+        <textarea
+          value={offer}
+          onChange={(e) => setOffer(e.target.value)}
+          rows={8}
+          placeholder="Collez ici le descriptif complet de l'offre d'emploi…"
+          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+        />
+        <div className="mt-3 flex flex-wrap items-center gap-4">
+          <Button
+            onClick={handleAnalyze}
+            disabled={analyze.isPending || offer.trim().length < 20 || cv?.status !== 'generated'}
+          >
+            {analyze.isPending ? 'Analyse en cours…' : 'Analyser la compatibilité'}
+          </Button>
+          {result && (
+            <Button variant="secondary" onClick={() => setResult(null)}>
+              Nouvelle analyse
             </Button>
-            {result && (
-              <Button variant="secondary" onClick={() => setResult(null)}>
-                Nouvelle analyse
-              </Button>
-            )}
-          </div>
-          {analyze.isError &&
-            analyze.error?.response?.status !== 402 && (
-              <p className="mt-2 text-sm text-red-600">
-                {analyze.error?.response?.data?.detail || 'Erreur lors de l’analyse.'}
-              </p>
-            )}
+          )}
         </div>
+        {analyze.isError && (
+          <p className="mt-2 text-sm text-red-600">
+            {analyze.error?.response?.data?.detail || 'Erreur lors de l’analyse.'}
+            {analyze.error?.response?.status === 429 &&
+              ' La limite quotidienne d’analyses a été atteinte.'}
+          </p>
+        )}
+      </div>
 
-        {result && <AnalysisResult result={result} />}
-      </PremiumGate>
-
-      <PaywallModal
-        open={paywallOpen}
-        onClose={() => setPaywallOpen(false)}
-        title="Analyse ATS"
-        message="L'analyse de compatibilité avec les offres d'emploi est réservée aux abonnés Premium."
-        onSuccess={() => setPaywallOpen(false)}
-      />
+      {result && <AnalysisResult result={result} />}
 
       {reports?.length > 1 && !result && (
         <div className="rounded-lg border border-slate-200 bg-white p-4">

@@ -1,16 +1,14 @@
 import { useState } from 'react'
-import { extractTextFile, parseCvText } from './importCv'
+import { parseCvFile } from './importCv'
 import { SECTION_LABELS } from './editorConfigs'
 import Button from '../../../components/ui/Button'
 
 const LABELS = SECTION_LABELS.fr
 
-export default function ImportModal({ open, onClose, onApply }) {
+export default function ImportModal({ open, onClose, onApply, pending = false, error = '' }) {
   const [file, setFile] = useState(null)
-  const [text, setText] = useState('')
-  const [mode, setMode] = useState('paste')
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
+  const [parseError, setParseError] = useState('')
   const [parsed, setParsed] = useState(null)
 
   if (!open) return null
@@ -22,28 +20,37 @@ export default function ImportModal({ open, onClose, onApply }) {
     return items.length
   }
 
+  // Plusieurs sections vides pendant que le résumé déborde : la détection des
+  // titres a échoué. On le dit, sinon l'utilisateur ne verrait qu'un CV bancal
+  // sans aucun indice de la cause.
+  const emptySections = parsed
+    ? Object.keys(LABELS).filter(
+        (key) => key !== 'summary' && key !== 'contact' && !sectionCount(key),
+      ).length
+    : 0
+  const layoutFailed = Boolean(parsed) && emptySections >= 4 && (parsed.summary || '').length > 600
+
   const handleParse = async () => {
     setBusy(true)
-    setError('')
+    setParseError('')
     try {
-      const raw = mode === 'file' && file ? await extractTextFile(file) : text
-      if (!raw || !raw.trim()) {
-        setError('Aucun texte à analyser. Collez du texte ou choisissez un fichier.')
-        return
-      }
-      const result = parseCvText(raw, 'fr')
-      setParsed(result)
-    } catch {
-      setError("Impossible d'extraire le texte de ce fichier. Essayez de coller le contenu directement.")
+      // Le chemin PDF passe par un pipeline distinct, qui exploite la mise en forme.
+      setParsed(await parseCvFile(file, 'fr'))
+    } catch (err) {
+      // Le message d'origine est indispensable : « impossible d'extraire » ne
+      // disait rien du vrai défaut (PDF scanné, .docx illisible, bug).
+      console.error('[import] extraction du fichier impossible', err)
+      setParseError(`Impossible d'analyser ce fichier : ${err?.message || 'erreur inconnue'}`)
     } finally {
       setBusy(false)
     }
   }
 
+  // Le parent redirige vers le nouveau CV en cas de succès : fermer ici averted
+  // l'écran, donc l'utilisateur ne verrait jamais le message d'erreur.
   const handleApply = () => {
-    if (!parsed) return
+    if (!parsed || pending) return
     onApply(parsed)
-    onClose()
   }
 
   return (
@@ -68,53 +75,32 @@ export default function ImportModal({ open, onClose, onApply }) {
         </div>
 
         <div className="flex-1 space-y-4 overflow-y-auto p-5">
-          <div className="flex items-center gap-1 rounded-lg bg-slate-100 p-0.5 w-fit">
-            <button
-              type="button"
-              onClick={() => setMode('paste')}
-              className={`rounded-md px-3 py-1.5 text-xs font-medium ${
-                mode === 'paste' ? 'bg-white text-slate-900 shadow' : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              Coller le texte
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode('file')}
-              className={`rounded-md px-3 py-1.5 text-xs font-medium ${
-                mode === 'file' ? 'bg-white text-slate-900 shadow' : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              Fichier (.txt · .docx · .pdf)
-            </button>
-          </div>
+          <p className="rounded-lg bg-indigo-50 px-3 py-2 text-xs text-indigo-900">
+            Un <strong>nouveau CV</strong> sera créé avec le contenu de votre fichier et le
+            <strong> même design</strong> que le CV actuel. Votre CV actuel n&apos;est pas
+            modifié.
+          </p>
 
-          {mode === 'paste' ? (
-            <textarea
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              rows={10}
-              placeholder="Collez ici le contenu de votre CV existant (nom, coordonnées, expériences, formations, compétences…)."
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center hover:border-indigo-400 hover:bg-indigo-50/40">
+            <input
+              type="file"
+              accept=".txt,.docx,.pdf,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              className="hidden"
+              onChange={(e) => setFile(e.target.files?.[0] || null)}
             />
-          ) : (
-            <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center hover:border-indigo-400 hover:bg-indigo-50/40">
-              <input
-                type="file"
-                accept=".txt,.docx,.pdf,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                className="hidden"
-                onChange={(e) => setFile(e.target.files?.[0] || null)}
-              />
-              <span className="text-sm font-medium text-slate-700">
-                {file ? file.name : 'Choisir un fichier CV'}
-              </span>
-              <span className="text-xs text-slate-500">
-                Formats acceptés : PDF, Word (.docx) ou texte brut
-              </span>
-            </label>
-          )}
+            <span className="text-sm font-medium text-slate-700">
+              {file ? file.name : 'Choisir un fichier CV'}
+            </span>
+            <span className="text-xs text-slate-500">
+              Formats acceptés : PDF, Word (.docx) ou texte brut
+            </span>
+            <span className="text-xs text-slate-500">
+              Le PDF doit contenir du texte sélectionnable : un PDF scanné ou composé
+              d&apos;images n&apos;est pas exploitable.
+            </span>
+          </label>
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {(parseError || error) && <p className="text-sm text-red-600">{parseError || error}</p>}
 
           {parsed && (
             <div className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-4">
@@ -130,7 +116,9 @@ export default function ImportModal({ open, onClose, onApply }) {
               <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5">
                 <p className="text-xs text-slate-600">
                   <span className="font-medium text-slate-900">En-tête :</span>{' '}
-                  {(parsed.header?.full_name ? 1 : 0) + Object.keys(parsed.header || {}).filter((k) => k !== 'full_name').length} champ(s)
+                  {(parsed.header?.full_name ? 1 : 0) +
+                    Object.keys(parsed.header || {}).filter((k) => k !== 'full_name').length}{' '}
+                  champ(s)
                 </p>
                 {Object.keys(LABELS).map((key) =>
                   key === 'contact' ? null : (
@@ -147,21 +135,28 @@ export default function ImportModal({ open, onClose, onApply }) {
                   {parsed.summary.length > 120 ? '…' : ''}
                 </p>
               )}
+              {layoutFailed && (
+                <p className="mt-3 rounded-lg bg-amber-100 p-2 text-xs text-amber-900">
+                  Les titres de sections de ce fichier n&apos;ont pas été reconnus : la
+                  plupart des informations se retrouve dans « {LABELS.summary} ». Vous
+                  pourrez les répartir après l&apos;import.
+                </p>
+              )}
             </div>
           )}
         </div>
 
         <div className="flex items-center justify-end gap-2 border-t border-slate-200 px-5 py-4">
-          <Button variant="secondary" onClick={onClose}>
+          <Button variant="secondary" onClick={onClose} disabled={pending}>
             Annuler
           </Button>
           {!parsed ? (
-            <Button onClick={handleParse} disabled={busy}>
+            <Button onClick={handleParse} disabled={busy || !file}>
               {busy ? 'Analyse…' : 'Analyser'}
             </Button>
           ) : (
-            <Button onClick={handleApply} disabled={busy}>
-              Appliquer
+            <Button onClick={handleApply} disabled={pending}>
+              {pending ? 'Création…' : 'Créer le CV'}
             </Button>
           )}
         </div>

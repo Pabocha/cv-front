@@ -1,1 +1,3 @@
-Access to XMLHttpRequest at 'http://localhost:8000/api/auth/me/' from origin 'http://localhost:5174' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.
+https://github.com/xitanggg/open-resume?utm_source=chatgpt.com
+https://github.com/Praveenkanna16/resume-parser?utm_source=chatgpt.com
+https://github.com/CD11b/pdf2text?utm_source=chatgpt.com

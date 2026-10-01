@@ -1,11 +1,17 @@
 import { Link } from 'react-router-dom'
 import { useAuth } from '../features/auth/AuthContext'
-import { useEntitlements } from '../features/payment/usePayments'
+import { useEntitlements, usePlans } from '../features/payment/usePayments'
+
+const formatCfa = (amount) => new Intl.NumberFormat('fr-FR').format(amount ?? 0)
 
 export default function DashboardPage() {
   const { user } = useAuth()
   const entitlements = useEntitlements()
+  const { data: plans } = usePlans()
   const isPremium = entitlements.data?.is_premium
+  const premiumPrice = plans?.find((p) => p.slug === 'premium')?.amount_cfa
+  // `clean_pdfs_remaining` vaut null quand l'export est illimité (Premium).
+  const cleanLeft = entitlements.data?.clean_pdfs_remaining
 
   return (
     <div className="space-y-6">
@@ -18,19 +24,31 @@ export default function DashboardPage() {
 
       {!isPremium && !entitlements.isLoading && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-5">
-          <div className="flex items-start justify-between">
+          <div className="flex items-start justify-between gap-6">
             <div>
               <span className="inline-block rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
                 Compte gratuit
               </span>
               <h2 className="mt-2 text-lg font-bold text-slate-900">
-                Activez votre offre pour créer vos CV
+                Tout est déjà ouvert, sauf le filigrane
               </h2>
               <p className="mt-1 max-w-lg text-sm text-slate-600">
-                La création de compte est gratuite. Activez une offre Premium dès
-                3 000 FCFA/mois pour accéder à la création, la génération, le
-                PDF, l'ATS, l'adaptation et les lettres de motivation.
+                Création, édition, génération depuis votre profil, aperçu et
+                analyse ATS : tout est gratuit, sans limite. Il vous reste{' '}
+                <strong>
+                  {typeof cleanLeft === 'number' ? cleanLeft : 1} export PDF
+                  sans filigrane
+                </strong>{' '}
+                ce mois-ci ; les suivants restent téléchargeables, mais portent la
+                mention « version gratuite ». L&apos;offre Premium ajoute la
+                création par prompt, l&apos;adaptation à une offre et les
+                lettres de motivation.
               </p>
+              {premiumPrice && (
+                <p className="mt-2 text-sm font-medium text-slate-700">
+                  Premium à {formatCfa(premiumPrice)} FCFA / mois.
+                </p>
+              )}
             </div>
             <Link
               to="/pricing"

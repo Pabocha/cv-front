@@ -2,7 +2,16 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   checkoutSubscription,
   getMyEntitlements,
+  getPlans,
 } from '../../api/payments'
+
+export function usePlans() {
+  return useQuery({
+    queryKey: ['plans'],
+    queryFn: async () => (await getPlans()).data,
+    staleTime: 5 * 60 * 1000,
+  })
+}
 
 export function useEntitlements() {
   return useQuery({
