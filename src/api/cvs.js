@@ -33,3 +33,5 @@ export const uploadCvPhoto = (id, file) => {
     headers: { 'Content-Type': 'multipart/form-data' },
   })
 }
+
+export const deleteCvPhoto = (id) => api.delete(`/cvs/${id}/photo/`)

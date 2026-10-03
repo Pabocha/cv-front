@@ -1,8 +1,28 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { uploadCvPhoto } from '../../../api/cvs'
+import { deleteCvPhoto, uploadCvPhoto } from '../../../api/cvs'
 
 const MIN_SCALE = 1
 const MAX_SCALE = 5
+
+// Miroir de profiles.serializers.validate_photo : le même filtre est appliqué
+// avant l'envoi, pour ne pas faire un aller-retour qui n'aboutirait qu'à un refus.
+const ALLOWED_EXT = ['jpg', 'jpeg', 'png', 'webp']
+const MAX_BYTES = 5 * 1024 * 1024
+const ACCEPT = 'image/jpeg,image/png,image/webp'
+
+const extOf = (name) => (name || '').toLowerCase().split('.').pop()
+
+const prettySize = (bytes) => `${Math.round(bytes / (1024 * 1024))} Mo`
+
+// Un refus Django (corps trop volumineux, par exemple) ne revient pas toujours
+// avec un `detail` lisible : on ne laisse jamais remonter un message vide.
+const uploadErrorMessage = (err) => {
+  const detail = err?.response?.data?.detail
+  if (detail) return String(detail)
+  if (err?.response?.status === 413) return "L'image est trop volumineuse pour être acceptée."
+  if (!err?.response) return "Impossible d'importer la photo : le serveur est injoignable."
+  return "Impossible d'importer la photo."
+}
 
 const fmt = (n) =>
   Number.isInteger(n) ? String(n) : String(Math.round(n * 100) / 100)
@@ -111,6 +131,18 @@ export default function PhotoModal({
     if (!file || !cvId) return
     setBusy(true)
     setError('')
+    if (!ALLOWED_EXT.includes(extOf(file.name))) {
+      setError('Format non supporté : utilisez une image JPEG, PNG ou WebP.')
+      setBusy(false)
+      return
+    }
+    if (file.size > MAX_BYTES) {
+      setError(
+        `L'image ne doit pas dépasser ${prettySize(MAX_BYTES)} (celle-ci fait ${prettySize(file.size)}).`,
+      )
+      setBusy(false)
+      return
+    }
     try {
       const { data } = await uploadCvPhoto(cvId, file)
       onChange('photo', data.photo)
@@ -123,13 +155,17 @@ export default function PhotoModal({
       setOx(50)
       setOy(50)
     } catch (err) {
-      setError(err?.response?.data?.detail || "Impossible d'importer la photo.")
+      setError(uploadErrorMessage(err))
     } finally {
       setBusy(false)
     }
   }
 
   const handleDelete = () => {
+    // Le retrait de l'image du CV est un effet local et instantané : le fichier
+    // ne doit pas pouvoir le bloquer. Un échec de suppression reste sans
+    // conséquence visible, et l'ancien fichier sera supprimé au prochain import.
+    deleteCvPhoto(cvId).catch(() => {})
     onChange('photo', '')
     onChange('photo_scale', null)
     onChange('photo_rotation', null)
@@ -215,6 +251,17 @@ export default function PhotoModal({
             </svg>
           </button>
         </div>
+
+        {/* Toujours monté, y compris sans photo : les deux boutons d'import
+            appellent `fileRef.current?.click()`, et un input absent rendait le
+            premier import impossible sans aucun message d'erreur. */}
+        <input
+          ref={fileRef}
+          type="file"
+          accept={ACCEPT}
+          className="hidden"
+          onChange={handleFile}
+        />
 
         <div className="relative">
           <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2">
@@ -404,13 +451,6 @@ export default function PhotoModal({
               </button>
             </div>
             <div className="flex items-center gap-2">
-              <input
-                ref={fileRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleFile}
-              />
               <button
                 type="button"
                 onClick={() => fileRef.current?.click()}

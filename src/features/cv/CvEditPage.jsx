@@ -2,6 +2,7 @@ import { lazy, Suspense, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useTemplates, usePdfCv, useImportCv } from './useCvs'
 import { getTemplateThumbnailUrl } from '../../api/templates'
+import { updateCv, uploadCvPhoto } from '../../api/cvs'
 import {
   DndContext,
   KeyboardSensor,
@@ -18,6 +19,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import Button from '../../components/ui/Button'
+import FieldInput from '../../components/ui/FieldInput'
 import PaywallModal from '../payment/PaywallModal'
 import { useEntitlements } from '../payment/usePayments'
 import useEditor from './editor/useEditor'
@@ -43,6 +45,28 @@ const SAVE_LABELS = {
   error: "Erreur d'enregistrement",
 }
 
+// Le serveur tire l'extension du nom de fichier : un Blob sans nom fait échouer
+// la validation, d'où le nom reconstruit ici.
+const PHOTO_EXT = { 'image/png': 'png', 'image/webp': 'webp', 'image/jpeg': 'jpg' }
+
+async function attachImportedPhoto(created, blob) {
+  try {
+    const ext = PHOTO_EXT[blob.type] || 'jpg'
+    const file = new File([blob], `photo-import.${ext}`, { type: blob.type })
+    const { data } = await uploadCvPhoto(created.id, file)
+    await updateCv(created.id, {
+      generated_content: {
+        ...created.generated_content,
+        header: { ...created.generated_content?.header, photo: data.photo },
+      },
+    })
+  } catch (err) {
+    // Le CV est déjà créé à ce stade : l'import a réussi, seule la photo est
+    // manquante. Bloquer l'import pour autant serait disproportionné.
+    console.error("[import] photo non transferée sur le nouveau CV", err)
+  }
+}
+
 function SaveIndicator({ saveState }) {
   if (saveState === 'idle') return null
   const color =
@@ -64,7 +88,7 @@ function HeaderEditor({ header, labels, onChange, cvId }) {
 
   return (
     <details className="group rounded-xl border border-slate-200 bg-white shadow-sm" open>
-      <summary className="flex cursor-pointer select-none items-center justify-between px-4 py-3 text-sm font-semibold text-slate-900">
+      <summary className="flex cursor-pointer select-none items-center justify-between px-4 py-3 text-base font-semibold text-slate-900">
         <span className="flex items-center gap-1.5">
           <svg
             viewBox="0 0 24 24"
@@ -94,63 +118,34 @@ function HeaderEditor({ header, labels, onChange, cvId }) {
               onChange={onChange}
               cvId={cvId}
             />
-            <div className="min-w-0 flex-1">
-              <label className="mb-0.5 block text-xs font-medium text-slate-600">
-                Nom complet
-              </label>
-              <input
-                value={header.full_name || ''}
-                onChange={(e) => onChange('full_name', e.target.value)}
-                className="w-full rounded-md bg-gray-100 border border-slate-200 px-3 py-3 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-            </div>
+            <FieldInput
+              wrapperClassName="min-w-0 flex-1"
+              size="lg"
+              label="Nom complet"
+              value={header.full_name || ''}
+              onChange={(e) => onChange('full_name', e.target.value)}
+            />
           </div>
         </div>
         {gridFields.map((f) => (
-          <div key={f.name}>
-            <label className="mb-0.5 block text-xs font-medium text-slate-600">
-              {f.label}
-            </label>
-            <input
-              value={header[f.name] || ''}
-              onChange={(e) => onChange(f.name, e.target.value)}
-              className="w-full rounded-md bg-gray-100 border border-slate-200 px-3 py-2.5 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
+          <FieldInput
+            key={f.name}
+            label={f.label}
+            value={header[f.name] || ''}
+            onChange={(e) => onChange(f.name, e.target.value)}
+          />
         ))}
 
         {activeOptional.map((f) => (
-          <div key={f.name}>
-            <label className="mb-0.5 block text-xs font-medium text-slate-600">
-              {f.label}
-            </label>
-            <div className="relative">
-              <input
-                value={header[f.name] || ''}
-                onChange={(e) => onChange(f.name, e.target.value)}
-                placeholder={f.placeholder || ''}
-                className="w-full rounded-md bg-gray-100 border border-slate-200 py-2.5 pl-3 pr-8 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-              <button
-                type="button"
-                onClick={() => onChange(f.name, null)}
-                title={`Retirer ${f.label.toLowerCase()}`}
-                className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700"
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  className="h-3.5 w-3.5"
-                  aria-hidden
-                >
-                  <path d="M6 6l12 12M18 6L6 18" />
-                </svg>
-              </button>
-            </div>
-          </div>
+          <FieldInput
+            key={f.name}
+            label={f.label}
+            placeholder={f.placeholder || ''}
+            value={header[f.name] || ''}
+            onChange={(e) => onChange(f.name, e.target.value)}
+            onClear={() => onChange(f.name, null)}
+            clearTitle={`Retirer ${f.label.toLowerCase()}`}
+          />
         ))}
 
         {available.length > 0 && (
@@ -283,7 +278,7 @@ export default function CvEditPage() {
     downloadPdf.mutate(cv.id)
   }
 
-  const handleApplyImport = async (parsed) => {
+  const handleApplyImport = async (parsed, { includePhoto = false } = {}) => {
     const content = {
       header: parsed.header || {},
       summary: parsed.summary || '',
@@ -301,7 +296,14 @@ export default function CvEditPage() {
     })
     try {
       const { data } = await importCv.mutateAsync({ id: cv.id, content })
-      navigate(`/cv/${data.cv.id}/edit`)
+      const created = data.cv
+      if (parsed.photoBlob && includePhoto) {
+        // La photo est un fichier : elle s'envoie sur le CV qui vient d'être
+        // créé, dont l'id n'est connu qu'ici. Son contenu n'est réécrit qu'ensuite,
+        // à partir de ce que le serveur a effectivement assaini.
+        await attachImportedPhoto(created, parsed.photoBlob)
+      }
+      navigate(`/cv/${created.id}/edit`)
     } catch (err) {
       setImportError(err?.response?.data?.detail || "L'import a échoué.")
     }

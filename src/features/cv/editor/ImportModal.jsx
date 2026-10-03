@@ -5,11 +5,23 @@ import Button from '../../../components/ui/Button'
 
 const LABELS = SECTION_LABELS.fr
 
+// Une data URL plutôt qu'un object URL : aucun cycle de vie à révoquer, et la
+// vignette n'existe que le temps de la modale.
+const blobToDataUrl = (blob) =>
+  new Promise((resolve) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result || ''))
+    reader.onerror = () => resolve('')
+    reader.readAsDataURL(blob)
+  })
+
 export default function ImportModal({ open, onClose, onApply, pending = false, error = '' }) {
   const [file, setFile] = useState(null)
   const [busy, setBusy] = useState(false)
   const [parseError, setParseError] = useState('')
   const [parsed, setParsed] = useState(null)
+  const [includePhoto, setIncludePhoto] = useState(true)
+  const [photoPreview, setPhotoPreview] = useState('')
 
   if (!open) return null
 
@@ -35,7 +47,11 @@ export default function ImportModal({ open, onClose, onApply, pending = false, e
     setParseError('')
     try {
       // Le chemin PDF passe par un pipeline distinct, qui exploite la mise en forme.
-      setParsed(await parseCvFile(file, 'fr'))
+      // `photo` demande en plus la photo du fichier, sans quoi l'import la perdrait.
+      const result = await parseCvFile(file, 'fr', { photo: true })
+      setParsed(result)
+      setPhotoPreview(result.photoBlob ? await blobToDataUrl(result.photoBlob) : '')
+      setIncludePhoto(true)
     } catch (err) {
       // Le message d'origine est indispensable : « impossible d'extraire » ne
       // disait rien du vrai défaut (PDF scanné, .docx illisible, bug).
@@ -50,7 +66,7 @@ export default function ImportModal({ open, onClose, onApply, pending = false, e
   // l'écran, donc l'utilisateur ne verrait jamais le message d'erreur.
   const handleApply = () => {
     if (!parsed || pending) return
-    onApply(parsed)
+    onApply(parsed, { includePhoto: includePhoto && Boolean(parsed.photoBlob) })
   }
 
   return (
@@ -134,6 +150,33 @@ export default function ImportModal({ open, onClose, onApply, pending = false, e
                   {LABELS.summary} : {parsed.summary.slice(0, 120)}
                   {parsed.summary.length > 120 ? '…' : ''}
                 </p>
+              )}
+              {parsed.photoBlob && (
+                <label className="mt-3 flex cursor-pointer items-start gap-3 rounded-lg bg-white p-2">
+                  <input
+                    type="checkbox"
+                    checked={includePhoto}
+                    onChange={(e) => setIncludePhoto(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 shrink-0 accent-indigo-600"
+                  />
+                  {photoPreview && (
+                    <img
+                      src={photoPreview}
+                      alt="Photo détectée dans le fichier"
+                      className="h-16 w-16 shrink-0 rounded-lg object-cover"
+                    />
+                  )}
+                  <span className="min-w-0">
+                    <span className="block text-xs font-medium text-slate-900">
+                      Photo détectée dans le fichier
+                    </span>
+                    <span className="block text-xs text-slate-500">
+                      {includePhoto
+                        ? 'Elle sera ajoutée au nouveau CV. Décochez si ce n’est pas votre photo.'
+                        : 'Elle ne sera pas ajoutée au nouveau CV.'}
+                    </span>
+                  </span>
+                </label>
               )}
               {layoutFailed && (
                 <p className="mt-3 rounded-lg bg-amber-100 p-2 text-xs text-amber-900">

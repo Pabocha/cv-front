@@ -1,5 +1,16 @@
 import { useState } from 'react'
 import Button from '../../../components/ui/Button'
+import FieldInput, { FieldLabel, fieldControlClass } from '../../../components/ui/FieldInput'
+import {
+  ArrowDown,
+  ArrowUp,
+  ChevronDown,
+  ChevronUp,
+  Eye,
+  EyeOff,
+  GripVertical,
+  Trash,
+} from '../../../components/ui/Icons'
 import RichEditor from './RichEditor'
 import {
   MONTH_NAMES,
@@ -14,12 +25,13 @@ import {
 const YEARS = yearOptions()
 
 function MonthYear({ value, onChange, language, options }) {
+  const compactClass = `${fieldControlClass} min-w-0 flex-1 px-2 py-1.5`
   return (
-    <span className="flex gap-1">
+    <span className="flex w-full gap-1">
       <select
         value={value.month ?? ''}
         onChange={(e) => onChange({ ...value, month: e.target.value })}
-        className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        className={compactClass}
       >
         <option value="">Mois</option>
         {(MONTH_NAMES[language] || MONTH_NAMES.fr).map((name, i) => (
@@ -32,7 +44,7 @@ function MonthYear({ value, onChange, language, options }) {
         value={value.year ?? ''}
         onChange={(e) => onChange({ ...value, year: e.target.value })}
         disabled={value.disabled}
-        className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-100 disabled:text-slate-400"
+        className={`${compactClass} disabled:bg-slate-100 disabled:text-slate-400`}
       >
         <option value="">Année</option>
         {options.map((y) => (
@@ -47,9 +59,9 @@ function MonthYear({ value, onChange, language, options }) {
 
 function PeriodPicker({ value, onChange, language, currentLabel }) {
   return (
-    <div className="space-y-1">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-xs text-slate-500">Début</span>
+    <div className="grid gap-3 sm:grid-cols-2">
+      <div className="min-w-0">
+        <FieldLabel label="Date de début" />
         <MonthYear
           value={{ month: value.startMonth, year: value.startYear }}
           onChange={(v) => onChange({ ...value, startMonth: v.month, startYear: v.year })}
@@ -57,55 +69,61 @@ function PeriodPicker({ value, onChange, language, currentLabel }) {
           options={YEARS}
         />
       </div>
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-xs text-slate-500">Fin</span>
+      <div className="min-w-0">
+        <div className="mb-0.5 flex items-center justify-between gap-2">
+          <FieldLabel label="Date de fin" />
+          <label className="flex shrink-0 items-center gap-1 text-xs text-slate-600">
+            <input
+              type="checkbox"
+              checked={Boolean(value.current)}
+              onChange={(e) => onChange({ ...value, current: e.target.checked })}
+            />
+            {currentLabel}
+          </label>
+        </div>
         <MonthYear
           value={{ month: value.endMonth, year: value.endYear, disabled: value.current }}
           onChange={(v) => onChange({ ...value, endMonth: v.month, endYear: v.year })}
           language={language}
           options={YEARS}
         />
-        <label className="flex items-center gap-1 whitespace-nowrap text-xs text-slate-600">
-          <input
-            type="checkbox"
-            checked={Boolean(value.current)}
-            onChange={(e) => onChange({ ...value, current: e.target.checked })}
-          />
-          {currentLabel}
-        </label>
       </div>
     </div>
   )
 }
 
 function DatePicker({ value, onChange, language }) {
-  return (
-    <div className="flex items-center justify-between gap-2">
-      <MonthYear value={value} onChange={onChange} language={language} options={YEARS} />
-    </div>
-  )
+  return <MonthYear value={value} onChange={onChange} language={language} options={YEARS} />
 }
 
 function DragButtons({ onMove, index, count }) {
   return (
-    <span className="flex flex-col gap-0.5">
+    <span className="flex shrink-0 flex-col">
       <button
         type="button"
         disabled={index === 0}
-        onClick={() => onMove(index - 1)}
-        className="disabled:opacity-30"
+        onClick={(e) => {
+          e.stopPropagation()
+          onMove(index - 1)
+        }}
+        className="rounded p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-30 disabled:hover:bg-transparent"
         aria-label="Monter"
+        title="Monter"
       >
-        ▲
+        <ArrowUp className="h-3.5 w-3.5" />
       </button>
       <button
         type="button"
         disabled={index === count - 1}
-        onClick={() => onMove(index + 1)}
-        className="disabled:opacity-30"
+        onClick={(e) => {
+          e.stopPropagation()
+          onMove(index + 1)
+        }}
+        className="rounded p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-30 disabled:hover:bg-transparent"
         aria-label="Descendre"
+        title="Descendre"
       >
-        ▼
+        <ArrowDown className="h-3.5 w-3.5" />
       </button>
     </span>
   )
@@ -158,11 +176,47 @@ function RatingPicker({ value, onChange }) {
   )
 }
 
+function FieldControl({ field: f, value, onChange, language }) {
+  if (f.type === 'textarea') return <RichEditor value={value ?? ''} onChange={onChange} rows={2} />
+  if (f.type === 'period')
+    return (
+      <PeriodPicker
+        value={value}
+        onChange={onChange}
+        language={language}
+        currentLabel={f.currentLabel || 'En poste'}
+      />
+    )
+  if (f.type === 'date')
+    return <DatePicker value={value} onChange={onChange} language={language} />
+  if (f.type === 'select')
+    return (
+      <select
+        value={value ?? ''}
+        onChange={(e) => onChange(e.target.value)}
+        className={`${fieldControlClass} w-full py-2.5 pl-3 pr-3`}
+      >
+        <option value="">Non renseigné</option>
+        {(f.options || []).map((opt) => (
+          <option key={opt} value={opt}>
+            {opt}
+          </option>
+        ))}
+      </select>
+    )
+  if (f.type === 'rating') return <RatingPicker value={value ?? 0} onChange={onChange} />
+  return null
+}
+
+const CUSTOM_CONTROL_TYPES = ['textarea', 'period', 'date', 'select', 'rating']
+
 function ItemEditor({ config, item, onSave, onCancel, language }) {
   const [form, setForm] = useState(
     config.fields.reduce((acc, f) => ({ ...acc, [f.name]: defaultValue(f, item) }), {}),
   )
   const [error, setError] = useState('')
+
+  const set = (name, value) => setForm({ ...form, [name]: value })
 
   const submit = (e) => {
     e.preventDefault()
@@ -182,59 +236,28 @@ function ItemEditor({ config, item, onSave, onCancel, language }) {
 
   return (
     <form onSubmit={submit} className="space-y-2 border-t border-slate-100 pt-2">
-      {config.fields.map((f) => (
-        <div key={f.name}>
-          <label className="mb-0.5 block text-xs font-medium text-slate-600">
-            {f.label}
-            {f.required && <span className="text-red-500"> *</span>}
-          </label>
-          {f.type === 'textarea' ? (
-            <RichEditor
-              value={form[f.name] ?? ''}
-              onChange={(v) => setForm({ ...form, [f.name]: v })}
-              rows={2}
-            />
-          ) : f.type === 'period' ? (
-            <PeriodPicker
+      {config.fields.map((f) =>
+        CUSTOM_CONTROL_TYPES.includes(f.type) ? (
+          <div key={f.name}>
+            <FieldLabel label={f.label} required={f.required} />
+            <FieldControl
+              field={f}
               value={form[f.name]}
-              onChange={(v) => setForm({ ...form, [f.name]: v })}
-              language={language}
-              currentLabel={f.currentLabel || 'En poste'}
-            />
-          ) : f.type === 'date' ? (
-            <DatePicker
-              value={form[f.name]}
-              onChange={(v) => setForm({ ...form, [f.name]: v })}
+              onChange={(v) => set(f.name, v)}
               language={language}
             />
-          ) : f.type === 'select' ? (
-            <select
-              value={form[f.name] ?? ''}
-              onChange={(e) => setForm({ ...form, [f.name]: e.target.value })}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value="">Non renseigné</option>
-              {(f.options || []).map((opt) => (
-                <option key={opt} value={opt}>
-                  {opt}
-                </option>
-              ))}
-            </select>
-          ) : f.type === 'rating' ? (
-            <RatingPicker
-              value={form[f.name] ?? 0}
-              onChange={(v) => setForm({ ...form, [f.name]: v })}
-            />
-          ) : (
-            <input
-              value={form[f.name] ?? ''}
-              onChange={(e) => setForm({ ...form, [f.name]: e.target.value })}
-              type={f.type === 'url' ? 'url' : 'text'}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-          )}
-        </div>
-      ))}
+          </div>
+        ) : (
+          <FieldInput
+            key={f.name}
+            label={f.label}
+            required={f.required}
+            value={form[f.name] ?? ''}
+            onChange={(e) => set(f.name, e.target.value)}
+            type={f.type === 'url' ? 'url' : 'text'}
+          />
+        ),
+      )}
       {error && <p className="text-xs text-red-600">{error}</p>}
       <div className="flex gap-2">
         <Button type="submit" className="text-xs">Enregistrer</Button>
@@ -263,8 +286,20 @@ function ListSection({ config, items, ops, language }) {
   return (
     <div className="space-y-2">
       {items.map((item, index) => (
-        <div key={`${itemLabel(item)}-${index}`} className="rounded-lg border border-slate-200 bg-white p-2">
-          <div className="flex items-center gap-2">
+        <div key={`${itemLabel(item)}-${index}`} className="rounded-lg border border-slate-200 bg-white">
+          <div
+            className="flex cursor-pointer items-center gap-2 rounded-lg p-2 hover:bg-slate-50"
+            onClick={() => setEditing(editing === index ? null : index)}
+            role="button"
+            tabIndex={0}
+            aria-expanded={editing === index}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                setEditing(editing === index ? null : index)
+              }
+            }}
+          >
             <DragButtons
               index={index}
               count={items.length}
@@ -278,25 +313,23 @@ function ListSection({ config, items, ops, language }) {
                 <p className="truncate text-xs text-slate-500">{itemSub(item)}</p>
               )}
             </div>
-            <div className="flex shrink-0 gap-1">
-              {editing !== index && editing !== 'new' && (
-                <Button variant="secondary" className="text-xs" onClick={() => setEditing(index)}>
-                  Modifier
-                </Button>
-              )}
-              <Button
-                variant="danger"
-                className="text-xs"
-                onClick={() => {
+            {editing === index && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
                   if (window.confirm('Supprimer cet élément ?')) ops.removeSectionItem(config.sectionKey, index)
                 }}
+                className="flex shrink-0 items-center justify-center rounded-md p-1.5 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                aria-label={`Supprimer ${itemLabel(item) || 'cet élément'}`}
+                title="Supprimer cet élément"
               >
-                Supprimer
-              </Button>
-            </div>
+                <Trash className="h-4 w-4" />
+              </button>
+            )}
           </div>
           {editing === index && (
-            <div className="mt-2">
+            <div className="px-2 pb-2">
               <ItemEditor
                 config={config}
                 item={items[index]}
@@ -437,6 +470,12 @@ export default function SectionCard({
       ? Boolean((content.summary || '').trim())
       : Array.isArray(content[section.key]) && content[section.key].length > 0
 
+  // Dans les modèles 2 colonnes, la page est une grille à deux cellules
+  // (`.cv-page { display: grid }`) : un saut de page dans la colonne latérale
+  // ne déplace pas la colonne principale, il produit une page dont la moitié
+  // est vide. Le bouton n'a donc aucun sens sur ces sections.
+  const inSidebar = isTwoCol && section.column === 'sidebar'
+
   return (
     <div className={`rounded-xl border bg-white shadow-sm ${section.visible ? 'border-slate-200' : 'border-dashed border-slate-300 bg-slate-50'}`}>
       <div
@@ -449,36 +488,40 @@ export default function SectionCard({
         <span className="flex items-center gap-1.5">
           {dragHandle && (
             <span
-              className="flex cursor-grab touch-none select-none flex-col text-slate-400 hover:text-slate-700"
+              className="flex cursor-grab touch-none select-none items-center text-slate-400 hover:text-slate-700"
               title="Faire glisser pour réordonner"
               {...dragHandle.attributes}
               {...dragHandle.listeners}
               onClick={(e) => e.stopPropagation()}
             >
-              ⠿
+              <GripVertical className="h-4 w-4" />
             </span>
           )}
-          <span className="flex flex-col text-xs text-slate-400">
+          <span className="flex flex-col">
             <button
               type="button"
               disabled={sectionIndex === 0}
               onClick={(e) => moveBy(e, -1)}
-              className="disabled:opacity-30 hover:text-slate-700"
+              className="rounded p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-30 disabled:hover:bg-transparent"
+              aria-label="Monter la rubrique"
+              title="Monter la rubrique"
             >
-              ▲
+              <ArrowUp className="h-4 w-4" />
             </button>
             <button
               type="button"
               disabled={sectionIndex === sectionCount - 1}
               onClick={(e) => moveBy(e, 1)}
-              className="disabled:opacity-30 hover:text-slate-700"
+              className="rounded p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-30 disabled:hover:bg-transparent"
+              aria-label="Descendre la rubrique"
+              title="Descendre la rubrique"
             >
-              ▼
+              <ArrowDown className="h-4 w-4" />
             </button>
           </span>
         </span>
         <span className="min-w-0 flex-1">
-          <span className={`block truncate text-sm font-semibold ${section.visible ? 'text-slate-900' : 'text-slate-400 line-through'}`}>
+          <span className={`block truncate text-base font-semibold ${section.visible ? 'text-slate-900' : 'text-slate-400 line-through'}`}>
             {label}
           </span>
           {!hasContent && (
@@ -510,33 +553,42 @@ export default function SectionCard({
               </button>
             </>
           )}
-          <button
-            type="button"
-            onClick={toggleBreak}
-            title="Commencer sur une nouvelle page"
-            className={`rounded px-1.5 py-0.5 text-xs ${
-              pageBreak ? 'bg-amber-500 text-white' : 'text-slate-400 hover:bg-slate-100'
-            }`}
-          >
-            ⏎
-          </button>
+          {/* `|| pageBreak` : un saut déjà enregistré sur cette section doit rester
+              désactivable, sinon la donnée deviendrait inatteignable. */}
+          {(!inSidebar || pageBreak) && (
+            <button
+              type="button"
+              onClick={toggleBreak}
+              title="Commencer sur une nouvelle page"
+              className={`rounded px-1.5 py-0.5 text-xs ${
+                pageBreak ? 'bg-amber-500 text-white' : 'text-slate-400 hover:bg-slate-100'
+              }`}
+            >
+              ⏎
+            </button>
+          )}
           <button
             type="button"
             onClick={toggleVisibility}
             title={section.visible ? 'Masquer la rubrique' : 'Afficher la rubrique'}
-            className={`rounded px-1.5 py-0.5 text-xs ${
-              section.visible ? 'text-emerald-600 hover:bg-slate-100' : 'text-slate-400 hover:bg-slate-100'
+            aria-label={section.visible ? 'Masquer la rubrique' : 'Afficher la rubrique'}
+            className={`rounded p-1.5 transition-colors hover:bg-slate-100 ${
+              section.visible ? 'text-emerald-600' : 'text-slate-400'
             }`}
           >
-            {section.visible ? '◉' : '○'}
+            {section.visible ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
           </button>
           <button
             type="button"
-            onClick={() => setOpen(!open)}
-            className="rounded px-1.5 py-0.5 text-xs text-slate-400 hover:bg-slate-100"
+            onClick={(e) => {
+              e.stopPropagation()
+              setOpen(!open)
+            }}
+            className="rounded p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
             aria-label={open ? 'Replier' : 'Déplier'}
+            title={open ? 'Replier' : 'Déplier'}
           >
-            {open ? '−' : '+'}
+            {open ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
           </button>
         </span>
       </div>

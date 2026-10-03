@@ -18,6 +18,7 @@ import { BULLET_RE } from './pdf/bulletPoints'
 import { readPdfItems } from './pdf/pdfItems'
 import { groupItemsIntoLines } from './pdf/lines'
 import { parseCvItems } from './pdf/parseCvItems'
+import extractImportPhoto from './importPhoto'
 
 const EMAIL_RE = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i
 const PHONE_RE = /(?:\+?\d{1,3}[\s-]?)?\(?\d{2,4}\)?[\s.-]?\d{2,4}[\s.-]?\d{2,4}(?:[\s.-]?\d{2,4})?/
@@ -354,12 +355,24 @@ async function extractPdf(file, lang = 'fr') {
 
 /**
  * Point d'entrée unique de l'import : choisit le pipeline adapté au format.
- * @returns {Promise<{header: object, summary: string, sections: object}>}
+ *
+ * `photo` demande en plus l'extraction de la photo du fichier, qui aboutit à un
+ * `Blob` dans `photoBlob`. Elle est optionnelle car tout le reste du pipeline est
+ * textuel, et une photo illisible ne doit jamais faire échouer l'import.
+ *
+ * @returns {Promise<{header: object, summary: string, sections: object, photoBlob: Blob|null}>}
  */
-export async function parseCvFile(file, lang = 'fr') {
+export async function parseCvFile(file, lang = 'fr', { photo = false } = {}) {
   if (!file) throw new Error('Aucun fichier sélectionné.')
   const name = (file?.name || '').toLowerCase()
-  if (name.endsWith('.pdf')) return extractPdf(file, lang)
+  const parsed = name.endsWith('.pdf')
+    ? await extractPdf(file, lang)
+    : await parseTextFile(file, lang)
+  if (photo) parsed.photoBlob = await extractImportPhoto(file)
+  return parsed
+}
+
+async function parseTextFile(file, lang) {
   const raw = await extractTextFile(file)
   if (!raw || !raw.trim()) throw new Error('Aucun texte à analyser. Choisissez un fichier CV.')
   return parseCvText(raw, lang)
