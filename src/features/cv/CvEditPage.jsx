@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useTemplates, usePdfCv, useImportCv } from './useCvs'
 import { getTemplateThumbnailUrl } from '../../api/templates'
@@ -235,6 +235,19 @@ export default function CvEditPage() {
   const [importOpen, setImportOpen] = useState(false)
   const [importError, setImportError] = useState('')
   const [templatePaywallOpen, setTemplatePaywallOpen] = useState(false)
+  const [scanOpen, setScanOpen] = useState(false)
+
+  // Échap referme la vue agrandie. Le popover du panneau de style garde son
+  // propre comportement (clic sur l'icône ou en dehors) : une seule action par
+  // geste, sans qu'Échap ne ferme les deux d'un coup.
+  useEffect(() => {
+    if (!scanOpen) return
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') setScanOpen(false)
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [scanOpen])
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -364,9 +377,9 @@ export default function CvEditPage() {
         <p className="bg-red-50 px-4 py-2 text-xs text-red-600">{saveError}</p>
       )}
 
-      {/* Contenu principal : 2 colonnes parfaitement réparties (Édition à gauche, Prévisualisation à droite) */}
+      {/* Contenu principal : 2 colonnes (Édition à gauche, Prévisualisation à droite) */}
       <div className="flex min-h-0 flex-1 flex-col gap-5 p-4 sm:p-5 lg:flex-row lg:gap-6">
-        
+
         {/* Colonne de gauche : Éditeur avec sections rétractables et fonds de champs gris */}
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1 lg:w-1/2 lg:flex-none">
           <HeaderEditor
@@ -403,19 +416,39 @@ export default function CvEditPage() {
           />
         </div>
 
-        {/* Colonne de droite : Prévisualisation en direct avec style bar */}
-        <div className="flex h-[60vh] min-h-0 flex-col overflow-hidden rounded-2xl border border-slate-300/80 bg-white shadow-[0_16px_40px_rgba(51,48,43,0.08)] lg:sticky lg:top-5 lg:h-[calc(100vh-6rem)] lg:w-1/2">
+        {/* Colonne de droite : Prévisualisation en direct. Plus de carte
+            encadrante — la place revient au CV — et la barre de style flotte
+            par-dessus, en bas à droite (elle s'auto-positionne). */}
+        <div className="relative flex h-[60vh] min-h-0 flex-col lg:sticky lg:top-5 lg:h-[calc(100vh-6rem)] lg:w-1/2">
+          <div className="min-h-0 flex-1">
+            <LivePreview html={liveHtml} />
+          </div>
           <StyleBar
             style={draft.style}
             onChange={editor.updateStyle}
             onOpenTemplates={() => setTemplateModalOpen(true)}
+            onToggleScan={() => setScanOpen(true)}
           />
-          <div className="min-h-0 flex-1 bg-slate-100 overflow-y-auto p-4">
-            <LivePreview html={liveHtml} />
-          </div>
         </div>
 
       </div>
+
+      {/* Vue agrandie : le CV seul, centré et à 100 % de base, avec le panneau de
+          personnalisation détaillé dessous. z-40 et non z-50 pour rester sous la
+          modale de modèles et la PaywallModal, toutes deux en z-50. */}
+      {scanOpen && (
+        <div className="fixed inset-0 z-40 bg-[#e8e6df]">
+          <LivePreview html={liveHtml} startFit={false} startZoom={100} center />
+          <StyleBar
+            variant="detailed"
+            style={draft.style}
+            onChange={editor.updateStyle}
+            onOpenTemplates={() => setTemplateModalOpen(true)}
+            onToggleScan={() => setScanOpen(false)}
+            scanActive
+          />
+        </div>
+      )}
 
       {templateModalOpen && (
         <div

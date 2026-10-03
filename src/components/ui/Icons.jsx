@@ -80,6 +80,22 @@ export function Trash({ className }) {
   )
 }
 
+export function Scan({ className }) {
+  return (
+    <Svg className={className}>
+      <path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3M3 12h18" />
+    </Svg>
+  )
+}
+
+export function Minimize2({ className }) {
+  return (
+    <Svg className={className}>
+      <path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7" />
+    </Svg>
+  )
+}
+
 export function GripVertical({ className }) {
   return (
     <Svg className={className}>
